@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="cs"><head>
+<meta charset="UTF-8">
+<title>AgroForest Detector v10 – učení neuronem (256px dlaždice)</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; font-family:sans-serif; background:#141419; color:#e5e5e5; display:flex; height:100vh; overflow:hidden; }
+.sidebar { width:32%; min-width:320px; height:100%; background:#1e1e26; padding:14px; border-right:2px solid #2d2d3a; overflow-y:auto; display:flex; flex-direction:column; gap:10px; }
+.map-viewport { flex:1; height:100%; background:#0b0b0e; overflow:auto; padding:20px; display:flex; }
+#map-container { margin:auto; position:relative; }
+.group { background:#262633; padding:10px; border-radius:6px; border:1px solid #333345; }
+h3 { margin:0 0 6px; font-size:12px; text-transform:uppercase; color:#00f5ff; }
+label { display:block; font-size:11px; margin-bottom:3px; color:#bbb; }
+.row { display:flex; gap:8px; align-items:center; margin-bottom:4px; }
+.row label { margin-bottom:0; flex:1; }
+input[type=range] { flex:2; width:100%; }
+input[type=checkbox] { width:16px; height:16px; margin:0; }
+input[type=file], select, button, input[type=text] { width:100%; padding:6px; background:#111116; border:1px solid #444; color:#fff; border-radius:4px; font-size:12px; }
+button { cursor:pointer; }
+button.primary { background:#008b94; font-weight:bold; border:none; }
+button.primary:hover { background:#00adb5; }
+button.secondary { background:#444; border:1px solid #555; }
+button.success { background:#28a745; border:none; font-weight:bold; }
+canvas { display:block; background:#000; box-shadow:0 10px 30px rgba(0,0,0,.8); image-rendering:pixelated; touch-action:none; cursor:crosshair; }
+textarea { width:100%; height:80px; background:#07070a; color:#00ffcc; border:1px solid #333; font-family:monospace; font-size:11px; padding:5px; resize:none; border-radius:4px; }
+.stats-box { font-size:12px; font-weight:bold; color:#ffcc00; padding:6px; border-radius:4px; background:#111; border:1px dashed #ffcc00; display:flex; flex-direction:column; gap:2px; }
+#status, #eval { font-family:monospace; font-size:11px; margin:4px 0 0; color:#00ffcc; }
+#eval { color:#ffcc00; }
+small { color:#888; font-size:10px; }
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <h2 style="margin:0;font-size:16px;color:#00f5ff;text-align:center;">AgroForest Detector v10</h2>
+
+  <div class="group"><h3>📁 1. Dlaždice ortofotomapy</h3><input type="file" id="file-input" accept="image/*"></div>
+
+  <div class="group"><h3>🔍 2. Zvětšení</h3>
+    <div class="row"><label>Zoom: <span id="view-zoom-val">300</span>%</label>
+    <input type="range" id="view-zoom" min="100" max="800" step="50" value="300"></div></div>
+
+  <div class="group"><h3>🎯 3. Učení z kruhů</h3>
+    <select id="draw-mode">
+      <option value="pos" selected>➕ Pozitivní kruh (koruna stromu/keře)</option>
+      <option value="neg">⛔ Negativní kruh (není strom – cesta, pole, stín…)</option>
+    </select>
+    <div class="row" style="margin-top:4px;"><input type="text" id="circle-label" placeholder="druh pozitivních kruhů, např. dub zimní"></div>
+    <div class="row"><label><input type="checkbox" id="auto-bg" checked> Vše mimo pozitivní kruhy je pozadí<br><small>zaškrtni, když jsi zakroužkoval VŠECHNY stromy na dlaždici; jinak kresli negativní kruhy a odškrtni</small></label></div>
+    <button id="learn-btn" class="primary">⚡ UČIT SE Z KRUHŮ</button>
+    <div class="row" style="margin-top:4px;"><button id="undo-btn" class="secondary">↩ Zpět</button><button id="det2pos-btn" class="secondary">Detekce → pozitivní</button></div>
+    <div class="row"><button id="clear-pos" class="secondary">Smazat pozitivní</button><button id="clear-neg" class="secondary">Smazat negativní</button></div>
+    <button id="reset-model" class="secondary">Zapomenout model (obecný režim)</button>
+    <p id="status">Stav: obecný model (nenaučeno)</p>
+    <p id="eval"></p>
+  </div>
+
+  <div class="group"><h3>🌿 4. Detekce</h3>
+    <div class="row"><label>Citlivost – práh skóre: <span id="thr-val">50</span>%</label><input type="range" id="thr" min="10" max="90" value="50"></div>
+    <div class="row"><label>Min. poloměr koruny: <span id="minr-val">3</span> px</label><input type="range" id="minr" min="2" max="30" value="3"></div>
+    <div class="row"><label>Max. poloměr jedné koruny: <span id="maxr-val">30</span> px<br><small>větší objekt = „skupina"</small></label><input type="range" id="maxr" min="5" max="120" value="30"></div>
+    <div class="row"><label><input type="checkbox" id="heatmap"> Heatmapa skóre</label></div>
+    <small>Heatmapa: průhledná = nízké skóre (pozadí), modrá → zelená → žlutá → červená = rostoucí pravděpodobnost stromu.</small>
+  </div>
+
+  <div class="group"><h3>🍂 5. „Bez listí"</h3>
+    <div class="row"><label>Práh zelenosti (G−(R+B)/2): <span id="leaf-val">12</span></label><input type="range" id="leaf-thr" min="-30" max="80" value="12"></div>
+    <small>Koruna s průměrnou zelení pod prahem = bez listí (oranžový obrys).</small></div>
+
+  <div class="group"><h3>🌲 6. Měřítko a výška</h3>
+    <div class="row"><label>GSD (m/px): <span id="gsd-val">0.25</span></label><input type="range" id="gsd" min="0.05" max="2" step="0.05" value="0.25"></div>
+    <div class="row"><label>Výška = Ø koruny ×</label>
+      <select id="h-coeff" style="flex:1.2;"><option value="1.2">1.2 (keře)</option><option value="1.8" selected>1.8 (listnáče)</option><option value="2.5">2.5 (jehličnany)</option></select></div></div>
+
+  <div class="group"><h3>🌍 7. Slunce a stíny (sever nahoře)</h3>
+    <div class="row"><label>Lat:</label><input type="text" id="lat" value="50.68" style="width:45%;"><label>Lon:</label><input type="text" id="lon" value="14.53" style="width:45%;"></div>
+    <div class="row"><label>Měsíc:</label>
+      <select id="month" style="width:35%;"><option value="3">Březen</option><option value="6" selected>Červen</option><option value="9">Září</option><option value="12">Prosinec</option></select>
+      <label>Hod: <span id="hour-val">12</span></label><input type="range" id="hour" min="6" max="20" value="12" style="width:40%;"></div></div>
+
+  <div class="group"><h3>📊 Statistiky a export</h3>
+    <div id="stats" class="stats-box"><div>Počet rostlin: 0</div><div>Plocha stínů: 0.00 m²</div></div>
+    <button id="export-btn" class="success" style="margin-top:6px;padding:8px;">📥 EXPORT CSV</button></div>
+
+  <div class="group"><h3>💾 Konfigurace (kruhy + naučený model)</h3>
+    <textarea id="config" placeholder="Po učení se zde objeví konfigurace…"></textarea>
+    <button id="import-btn" class="secondary" style="margin-top:5px;">Načíst vloženou konfiguraci</button></div>
+</div>
+
+<div class="map-viewport"><div id="map-container"><canvas id="view"></canvas></div></div>
+
+<script>
+"use strict";
+// ==CORE-START==
+const NF = 11;
+function sig(x){ return 1/(1+Math.exp(-x)); }
+
+function boxMean(a, W, H, rad){
+    const IW=W+1, I=new Float64Array(IW*(H+1));
+    for (let y=0;y<H;y++){ let run=0; for (let x=0;x<W;x++){ run+=a[y*W+x]; I[(y+1)*IW+x+1]=I[y*IW+x+1]+run; } }
+    const out=new Float32Array(W*H);
+    for (let y=0;y<H;y++){
+        const y0=Math.max(0,y-rad), y1=Math.min(H-1,y+rad);
+        for (let x=0;x<W;x++){
+            const x0=Math.max(0,x-rad), x1=Math.min(W-1,x+rad);
+            const s=I[(y1+1)*IW+x1+1]-I[y0*IW+x1+1]-I[(y1+1)*IW+x0]+I[y0*IW+x0];
+            out[y*W+x]=s/((x1-x0+1)*(y1-y0+1));
+        }
+    }
+    return out;
+}
+
+// Příznaky na pixel (11): zelenost, jas, sytost, sin/cos odstínu*sytost, textura 5×5 a 11×11,
+// lokální kontrast (pixel vs. okolí 21×21), průměrná zelenost okolí, vyhlazený jas, hustota hran
+function buildFeatures(rgba, W, H){
+    const n=W*H;
+    const gray=new Float32Array(n), grn=new Float32Array(n), V=new Float32Array(n), S=new Float32Array(n);
+    const sh=new Float32Array(n), ch=new Float32Array(n), gray2=new Float32Array(n);
+    for (let i=0,p=0;i<n;i++,p+=4){
+        const r=rgba[p], g=rgba[p+1], b=rgba[p+2];
+        gray[i]=(r+g+b)/3; gray2[i]=gray[i]*gray[i]; grn[i]=g-(r+b)/2;
+        const mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn;
+        V[i]=mx/255; S[i]= mx===0 ? 0 : d/mx;
+        if (d>0){
+            let h;
+            if (mx===r) h=((g-b)/d+(g<b?6:0)); else if (mx===g) h=((b-r)/d+2); else h=((r-g)/d+4);
+            const a=h*Math.PI/3; sh[i]=Math.sin(a)*S[i]; ch[i]=Math.cos(a)*S[i];
+        }
+    }
+    const m2=boxMean(gray,W,H,2), q2=boxMean(gray2,W,H,2);
+    const m5=boxMean(gray,W,H,5), q5=boxMean(gray2,W,H,5);
+    const m10=boxMean(gray,W,H,10), m3=boxMean(gray,W,H,3), g4=boxMean(grn,W,H,4);
+    const mag=new Float32Array(n);
+    for (let y=1;y<H-1;y++) for (let x=1;x<W-1;x++){
+        const i=y*W+x, gx=gray[i+1]-gray[i-1], gy=gray[i+W]-gray[i-W];
+        mag[i]=Math.sqrt(gx*gx+gy*gy);
+    }
+    const gm=boxMean(mag,W,H,3);
+    const F=new Float32Array(n*NF);
+    for (let i=0;i<n;i++){
+        const o=i*NF;
+        F[o]=grn[i]/32; F[o+1]=V[i]; F[o+2]=S[i]; F[o+3]=sh[i]; F[o+4]=ch[i];
+        F[o+5]=Math.sqrt(Math.max(0,q2[i]-m2[i]*m2[i]))/32;
+        F[o+6]=Math.sqrt(Math.max(0,q5[i]-m5[i]*m5[i]))/32;
+        F[o+7]=(gray[i]-m10[i])/64;
+        F[o+8]=g4[i]/32; F[o+9]=m3[i]/255; F[o+10]=gm[i]/32;
+    }
+    return { F, grn, W, H };
+}
+
+function mulberry(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+// Malá neuronová síť 11 → 6 → 1 (tanh, sigmoid), Adam, vyvážené třídy
+function trainMLP(X, y, opts){
+    opts = opts || {};
+    const D=NF, Hn=6, n=X.length, epochs=opts.epochs||300, lr=opts.lr||0.03, lam=1e-3;
+    const mean=new Float64Array(D), std=new Float64Array(D);
+    for (const s of X) for (let k=0;k<D;k++) mean[k]+=s[k];
+    for (let k=0;k<D;k++) mean[k]/=n;
+    for (const s of X) for (let k=0;k<D;k++){ const d=s[k]-mean[k]; std[k]+=d*d; }
+    for (let k=0;k<D;k++) std[k]=Math.sqrt(std[k]/n)+1e-3;
+    const Z=new Float32Array(n*D);
+    for (let s=0;s<n;s++) for (let k=0;k<D;k++) Z[s*D+k]=(X[s][k]-mean[k])/std[k];
+    let np=0; for (const v of y) np+=v; const nn=n-np;
+    const sw=new Float32Array(n); for (let s=0;s<n;s++) sw[s]= y[s] ? n/(2*np) : n/(2*nn);
+    const rnd=mulberry(12345);
+    const w1=new Float64Array(Hn*D).map(()=> (rnd()-0.5)*0.6), b1=new Float64Array(Hn);
+    const w2=new Float64Array(Hn).map(()=> (rnd()-0.5)*0.6); let b2=0;
+    const params=[w1,b1,w2];
+    const mA=[new Float64Array(Hn*D),new Float64Array(Hn),new Float64Array(Hn)], vA=[new Float64Array(Hn*D),new Float64Array(Hn),new Float64Array(Hn)];
+    let mb=0, vb=0;
+    const gw1=new Float64Array(Hn*D), gb1=new Float64Array(Hn), gw2=new Float64Array(Hn), h=new Float64Array(Hn);
+    for (let ep=1; ep<=epochs; ep++){
+        gw1.fill(0); gb1.fill(0); gw2.fill(0); let gb2=0;
+        for (let s=0;s<n;s++){
+            const base=s*D;
+            for (let j=0;j<Hn;j++){ let a=b1[j]; const jo=j*D; for (let k=0;k<D;k++) a+=w1[jo+k]*Z[base+k]; h[j]=Math.tanh(a); }
+            let z=b2; for (let j=0;j<Hn;j++) z+=w2[j]*h[j];
+            const dz=sw[s]*(sig(z)-y[s])/n;
+            gb2+=dz;
+            for (let j=0;j<Hn;j++){
+                gw2[j]+=dz*h[j];
+                const dh=dz*w2[j]*(1-h[j]*h[j]); gb1[j]+=dh;
+                const jo=j*D; for (let k=0;k<D;k++) gw1[jo+k]+=dh*Z[base+k];
+            }
+        }
+        for (let i=0;i<gw1.length;i++) gw1[i]+=lam*w1[i];
+        for (let i=0;i<Hn;i++) gw2[i]+=lam*w2[i];
+        const gs=[gw1,gb1,gw2], b1c=1-Math.pow(0.9,ep), b2c=1-Math.pow(0.999,ep);
+        for (let t=0;t<3;t++){
+            const P=params[t], G=gs[t], M=mA[t], Vv=vA[t];
+            for (let i=0;i<P.length;i++){
+                M[i]=0.9*M[i]+0.1*G[i]; Vv[i]=0.999*Vv[i]+0.001*G[i]*G[i];
+                P[i]-=lr*(M[i]/b1c)/(Math.sqrt(Vv[i]/b2c)+1e-8);
+            }
+        }
+        mb=0.9*mb+0.1*gb2; vb=0.999*vb+0.001*gb2*gb2; b2-=lr*(mb/b1c)/(Math.sqrt(vb/b2c)+1e-8);
+    }
+    return { mean:Array.from(mean), std:Array.from(std), w1:Array.from(w1), b1:Array.from(b1), w2:Array.from(w2), b2 };
+}
+
+function predictMLP(M, F, n){
+    const D=NF, Hn=M.b1.length, out=new Float32Array(n), h=new Float64Array(Hn), z0=new Float64Array(D);
+    for (let i=0;i<n;i++){
+        const o=i*D;
+        for (let k=0;k<D;k++) z0[k]=(F[o+k]-M.mean[k])/M.std[k];
+        let z=M.b2;
+        for (let j=0;j<Hn;j++){ let a=M.b1[j]; const jo=j*D; for (let k=0;k<D;k++) a+=M.w1[jo+k]*z0[k]; z+=M.w2[j]*Math.tanh(a); }
+        out[i]=sig(z);
+    }
+    return out;
+}
+
+// Obecný odhad bez učení: zelená vegetace NEBO tmavý hrubě texturovaný nezelený objekt
+function genericScore(F, n){
+    const out=new Float32Array(n);
+    for (let i=0;i<n;i++){
+        const o=i*NF, grn=F[o]*32, tex=F[o+6]*32, con=F[o+7]*64, S=F[o+2];
+        const veg=sig((grn-8)/4)*sig((tex-3)/2);
+        const bare=sig((-con-6)/4)*sig((tex-6)/2.5)*sig((0.35-S)/0.1);
+        out[i]=Math.max(veg*0.9, bare*0.8);
+    }
+    return out;
+}
+
+// Detekce: práh → vzdálenostní transformace → středy koruny (lokální maxima) → přiřazení pixelů
+function detectCore(score, W, H, p, F, grn){
+    const n=W*H, ss=boxMean(score,W,H,1);
+    const mask=new Uint8Array(n);
+    for (let i=0;i<n;i++) mask[i]= ss[i]>=p.thr ? 1 : 0;
+    // chamfer 3-4
+    const BIG=1e6, d=new Float32Array(n);
+    for (let i=0;i<n;i++) d[i]= mask[i] ? BIG : 0;
+    for (let y=0;y<H;y++) for (let x=0;x<W;x++){
+        const i=y*W+x; if (!d[i]) continue; let v=d[i];
+        if (x>0) v=Math.min(v,d[i-1]+3);
+        if (y>0){ v=Math.min(v,d[i-W]+3); if (x>0) v=Math.min(v,d[i-W-1]+4); if (x<W-1) v=Math.min(v,d[i-W+1]+4); }
+        d[i]=v;
+    }
+    for (let y=H-1;y>=0;y--) for (let x=W-1;x>=0;x--){
+        const i=y*W+x; if (!d[i]) continue; let v=d[i];
+        if (x<W-1) v=Math.min(v,d[i+1]+3);
+        if (y<H-1){ v=Math.min(v,d[i+W]+3); if (x<W-1) v=Math.min(v,d[i+W+1]+4); if (x>0) v=Math.min(v,d[i+W-1]+4); }
+        d[i]=v;
+    }
+    for (let i=0;i<n;i++) d[i]= d[i]>=BIG ? 0 : d[i]/3;     // pixel zcela uvnitř obrazu bez okraje masky
+    // pokud je celá maska bez okraje (vše nad prahem), nic nenajdeme
+    const cand=[];
+    for (let y=1;y<H-1;y++) for (let x=1;x<W-1;x++){
+        const i=y*W+x, v=d[i]; if (v<p.minR) continue;
+        if (d[i-1]>v||d[i+1]>v||d[i-W]>v||d[i+W]>v||d[i-W-1]>v||d[i-W+1]>v||d[i+W-1]>v||d[i+W+1]>v) continue;
+        cand.push(i);
+    }
+    cand.sort((a,b)=>d[b]-d[a]);
+    const seeds=[];
+    for (const i of cand){
+        const x=i%W, y=(i-x)/W; let ok=true;
+        for (const s of seeds){ const dx=s.x-x, dy=s.y-y; if (dx*dx+dy*dy < (s.r*1.05)*(s.r*1.05)){ ok=false; break; } }
+        if (ok) seeds.push({x,y,r:d[i]});
+    }
+    const best=new Float32Array(n).fill(Infinity), id=new Int32Array(n).fill(-1);
+    seeds.forEach((s,k)=>{
+        const R=Math.ceil(s.r*1.8+2);
+        const x0=Math.max(0,Math.floor(s.x-R)), x1=Math.min(W-1,Math.ceil(s.x+R)), y0=Math.max(0,Math.floor(s.y-R)), y1=Math.min(H-1,Math.ceil(s.y+R));
+        for (let y=y0;y<=y1;y++) for (let x=x0;x<=x1;x++){
+            const i=y*W+x; if (!mask[i]) continue;
+            const dx=x-s.x, dy=y-s.y, dd=dx*dx+dy*dy; if (dd>R*R) continue;
+            const pd=dd-s.r*s.r; if (pd<best[i]){ best[i]=pd; id[i]=k; }
+        }
+    });
+    const acc=seeds.map(()=>({a:0,sx:0,sy:0,sg:0,edge:false,f:new Float64Array(NF)}));
+    for (let i=0;i<n;i++){
+        const k=id[i]; if (k<0) continue; const a=acc[k], x=i%W, y=(i-x)/W;
+        a.a++; a.sx+=x; a.sy+=y; a.sg+=grn[i];
+        if (x===0||y===0||x===W-1||y===H-1) a.edge=true;
+        const o=i*NF; for (let q=0;q<NF;q++) a.f[q]+=F[o+q];
+    }
+    const out=[];
+    seeds.forEach((s,k)=>{
+        const a=acc[k]; if (a.a < Math.PI*p.minR*p.minR*0.8) return;
+        const meanG=a.sg/a.a, fm=Array.from(a.f,v=>v/a.a);
+        const group = a.a > Math.PI*p.maxR*p.maxR || a.a/(Math.PI*s.r*s.r) > 1.8;
+        out.push({ cx:a.sx/a.a, cy:a.sy/a.a, diam:2*Math.sqrt(a.a/Math.PI), r:s.r, area:a.a, meanG,
+                   leafless: meanG < p.leafThr, group, edge:a.edge, fmean:fm, label:'' });
+    });
+    return { dets:out, smooth:ss };
+}
+// ==CORE-END==
+
+// ==================== UI a stav ====================
+const $ = id => document.getElementById(id);
+const canvas = $('view'), ctx = canvas.getContext('2d');
+const buf = document.createElement('canvas'), bctx = buf.getContext('2d', { willReadFrequently:true });
+const heatCv = document.createElement('canvas'), hctx = heatCv.getContext('2d');
+const statusEl = $('status'), evalEl = $('eval'), statsEl = $('stats');
+
+let img = new Image(), tileKey = 'tile';
+let posCircles = [], negCircles = [], history = [];
+let feats = null, score = null, detections = [];
+let model = null, protos = [];
+const bank = {};                       // tileKey -> {pos:[], neg:[]} – vzorky se hromadí napříč dlaždicemi
+let drawing = false, drawX = 0, drawY = 0, drawR = 0;
+
+function params(){
+    return { thr: +$('thr').value/100, minR: +$('minr').value, maxR: +$('maxr').value, leafThr: +$('leaf-thr').value };
+}
+
+// ---------- načtení obrázku ----------
+$('file-input').addEventListener('change', e => {
+    if (!e.target.files.length) return;
+    tileKey = e.target.files[0].name;
+    img = new Image();
+    img.onload = () => {
+        const sc = Math.min(1, 1200/img.width, 1200/img.height);
+        canvas.width = buf.width = heatCv.width = Math.round(img.width*sc);
+        canvas.height = buf.height = heatCv.height = Math.round(img.height*sc);
+        bctx.drawImage(img, 0, 0, buf.width, buf.height);
+        posCircles = []; negCircles = []; history = [];
+        applyZoom();
+        recomputeFeatures(); recomputeScore(); recomputeDetect(); render();
+    };
+    img.src = URL.createObjectURL(e.target.files[0]);
+});
+function applyZoom(){
+    const z = +$('view-zoom').value/100;
+    canvas.style.width = canvas.width*z + 'px'; canvas.style.height = canvas.height*z + 'px';
+}
+$('view-zoom').addEventListener('input', e => { $('view-zoom-val').textContent = e.target.value; applyZoom(); });
+
+// ---------- výpočetní kroky (každý zvlášť, aby posuvníky byly rychlé) ----------
+function recomputeFeatures(){
+    const W = buf.width, H = buf.height;
+    feats = buildFeatures(bctx.getImageData(0,0,W,H).data, W, H);
+}
+function recomputeScore(){
+    if (!feats) return;
+    const n = feats.W*feats.H;
+    score = model ? predictMLP(model, feats.F, n) : genericScore(feats.F, n);
+    for (const c of negCircles) paintCircle(score, c, 0);       // negativní kruh = tvrdý zákaz
+    buildHeat();
+}
+function paintCircle(arr, c, v){
+    const W = feats.W, H = feats.H;
+    for (let y=Math.max(0,Math.floor(c.y-c.r)); y<=Math.min(H-1,Math.ceil(c.y+c.r)); y++)
+        for (let x=Math.max(0,Math.floor(c.x-c.r)); x<=Math.min(W-1,Math.ceil(c.x+c.r)); x++)
+            if ((x-c.x)**2+(y-c.y)**2 <= c.r*c.r) arr[y*W+x] = v;
+}
+function recomputeDetect(){
+    if (!feats || !score) return;
+    const r = detectCore(score, feats.W, feats.H, params(), feats.F, feats.grn);
+    detections = r.dets;
+    labelDetections();
+    evaluate();
+}
+function labelDetections(){
+    for (const d of detections){
+        let lab = '', bestD = 1e9;
+        if (model && protos.length){
+            for (const p of protos){
+                let s = 0;
+                for (let k=0;k<NF;k++){ const z = (d.fmean[k]-p.vec[k])/model.std[k]; s += z*z; }
+                s = Math.sqrt(s/NF);
+                if (s < bestD){ bestD = s; lab = p.label; }
+            }
+            if (bestD > 1.2) lab = '';
+        }
+        d.label = lab || (d.leafless ? '(bez listí)' : '(s listím)');
+    }
+}
+function evaluate(){
+    if (!posCircles.length){ evalEl.textContent = ''; return; }
+    let hit = 0;
+    for (const c of posCircles)
+        if (detections.some(d => Math.hypot(d.cx-c.x, d.cy-c.y) <= Math.max(c.r, d.diam/2))) hit++;
+    const outside = detections.filter(d => !posCircles.some(c => Math.hypot(d.cx-c.x, d.cy-c.y) <= Math.max(c.r, d.diam/2))).length;
+    evalEl.textContent = 'Zásah: ' + hit + ' z ' + posCircles.length + ' pozitivních kruhů má detekci. Detekce mimo kruhy: ' + outside + ' z ' + detections.length + '.';
+}
+function buildHeat(){
+    const W = feats.W, H = feats.H, im = hctx.createImageData(W, H), d = im.data;
+    for (let i=0;i<score.length;i++){
+        const s = score[i]; if (s < 0.15) continue;
+        const t = (s-0.15)/0.85, hue = 240 - 240*t;               // modrá → červená
+        const [r,g,b] = hsl2rgb(hue/360, 1, 0.5);
+        const p = i*4; d[p]=r; d[p+1]=g; d[p+2]=b; d[p+3]=130;
+    }
+    hctx.putImageData(im, 0, 0);
+}
+function hsl2rgb(h,s,l){
+    const f = n => { const k=(n+h*12)%12, a=s*Math.min(l,1-l); return Math.round(255*(l-a*Math.max(-1,Math.min(k-3,9-k,1)))); };
+    return [f(0), f(8), f(4)];
+}
+
+// ---------- slunce (azimut od severu po směru hodin; obraz má sever nahoře) ----------
+function calcSun(lat, month, hour){
+    const latR = lat*Math.PI/180, doy = {3:80,6:172,9:265,12:355}[month] || 172;
+    const decl = 23.45*Math.PI/180*Math.sin(2*Math.PI*(284+doy)/365);
+    const ha = (hour-12)*15*Math.PI/180;
+    const sinEl = Math.sin(latR)*Math.sin(decl) + Math.cos(latR)*Math.cos(decl)*Math.cos(ha);
+    const el = Math.asin(sinEl);
+    const cosAz = (Math.sin(decl)-Math.sin(el)*Math.sin(latR))/(Math.cos(el)*Math.cos(latR));
+    let az = Math.acos(Math.max(-1, Math.min(1, cosAz)));
+    if (ha > 0) az = 2*Math.PI - az;
+    const k = Math.min(6, el > 0.05 ? 1/Math.tan(el) : 6);
+    const a = az + Math.PI;                       // stín míří opačně než slunce
+    return { dx: Math.sin(a), dy: -Math.cos(a), coeff: k };   // x = východ, y = jih (dolů)
+}
+
+// ---------- vykreslení ----------
+function strokeCircle(c, color, w){
+    ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, 2*Math.PI); ctx.strokeStyle = color; ctx.lineWidth = w; ctx.stroke();
+}
+function render(){
+    if (!feats) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(buf, 0, 0);
+    if ($('heatmap').checked) ctx.drawImage(heatCv, 0, 0);
+    const gsd = +$('gsd').value, hCoeff = +$('h-coeff').value;
+    const sun = calcSun(parseFloat($('lat').value), +$('month').value, +$('hour').value);
+    let totalShadow = 0, bare = 0, groups = 0;
+    detections.forEach(d => {
+        const r = d.diam/2, dM = d.diam*gsd, hM = dM*hCoeff, shLen = hM*sun.coeff, shPx = shLen/gsd;
+        totalShadow += dM*shLen/2; if (d.leafless) bare++; if (d.group) groups++;
+        const px = -sun.dy*r, py = sun.dx*r, tx = d.cx+sun.dx*shPx, ty = d.cy+sun.dy*shPx;
+        ctx.beginPath(); ctx.moveTo(d.cx+px, d.cy+py); ctx.lineTo(tx, ty); ctx.lineTo(d.cx-px, d.cy-py); ctx.closePath();
+        ctx.fillStyle = 'rgba(0,245,255,0.15)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(d.cx, d.cy, r, 0, 2*Math.PI);
+        ctx.strokeStyle = d.group ? '#ff55ff' : (d.leafless ? '#ffaa00' : '#00f5ff');
+        ctx.lineWidth = 1.2; ctx.setLineDash(d.edge ? [3,2] : []); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = '#ff3366'; ctx.fillRect(d.cx-1, d.cy-1, 2, 2);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 7px monospace'; ctx.shadowColor = '#000'; ctx.shadowBlur = 3;
+        ctx.fillText('Ø' + dM.toFixed(1) + 'm ' + (d.group ? '[skupina] ' : '') + d.label, d.cx-r, d.cy-r-2);
+        ctx.shadowBlur = 0;
+    });
+    statsEl.innerHTML = '<div>Počet rostlin: ' + detections.length + ' (bez listí: ' + bare + ', skupin: ' + groups + ')</div>' +
+                        '<div>Plocha stínů (součet): ' + totalShadow.toFixed(2) + ' m²</div>';
+    posCircles.forEach(c => strokeCircle(c, '#ff9900', 1.5));
+    negCircles.forEach(c => strokeCircle(c, '#ff33cc', 1.5));
+    if (drawing){
+        ctx.setLineDash([3,2]); strokeCircle({x:drawX, y:drawY, r:drawR}, $('draw-mode').value==='pos' ? '#ffff00' : '#ff33cc', 1); ctx.setLineDash([]);
+    }
+}
+
+// ---------- kreslení kruhů (pointer events, žádná analýza při tažení) ----------
+function coords(e){
+    const r = canvas.getBoundingClientRect();
+    return { x:(e.clientX-r.left)*canvas.width/r.width, y:(e.clientY-r.top)*canvas.height/r.height };
+}
+canvas.addEventListener('pointerdown', e => {
+    if (!feats || e.button !== 0) return;
+    const c = coords(e); drawing = true; drawX = c.x; drawY = c.y; drawR = 0;
+    canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', e => {
+    if (!drawing) return;
+    const c = coords(e); drawR = Math.hypot(c.x-drawX, c.y-drawY); render();
+});
+canvas.addEventListener('pointerup', e => {
+    if (!drawing) return;
+    drawing = false;
+    if (drawR > 2){
+        if ($('draw-mode').value === 'pos'){ posCircles.push({ x:drawX, y:drawY, r:drawR, label:$('circle-label').value.trim() }); history.push('pos'); }
+        else { negCircles.push({ x:drawX, y:drawY, r:drawR }); history.push('neg'); recomputeScore(); recomputeDetect(); }
+    }
+    evaluate(); render();
+});
+
+// ---------- učení ----------
+function collectSamples(){
+    const W = feats.W, H = feats.H, F = feats.F, rnd = mulberry(99);
+    const pos = [], neg = [];
+    const sample = i => F.slice(i*NF, (i+1)*NF);
+    posCircles.forEach(c => {
+        const R = Math.max(1.5, c.r*0.9);
+        for (let y=Math.max(0,Math.floor(c.y-R)); y<=Math.min(H-1,Math.ceil(c.y+R)); y++)
+            for (let x=Math.max(0,Math.floor(c.x-R)); x<=Math.min(W-1,Math.ceil(c.x+R)); x++)
+                if ((x-c.x)**2+(y-c.y)**2 <= R*R && rnd() < 0.5) pos.push(sample(y*W+x));
+    });
+    negCircles.forEach(c => {
+        for (let y=Math.max(0,Math.floor(c.y-c.r)); y<=Math.min(H-1,Math.ceil(c.y+c.r)); y++)
+            for (let x=Math.max(0,Math.floor(c.x-c.r)); x<=Math.min(W-1,Math.ceil(c.x+c.r)); x++)
+                if ((x-c.x)**2+(y-c.y)**2 <= c.r*c.r && rnd() < 0.5) neg.push(sample(y*W+x));
+    });
+    if ($('auto-bg').checked && posCircles.length){
+        const keep = Math.min(0.2, 3000/(W*H));
+        for (let y=0;y<H;y++) for (let x=0;x<W;x++){
+            if (rnd() > keep) continue;
+            if (posCircles.some(c => (x-c.x)**2+(y-c.y)**2 <= (c.r*1.3)**2)) continue;
+            neg.push(sample(y*W+x));
+        }
+    }
+    const cap = (a, m) => { while (a.length > m) a.splice((rnd()*a.length)|0, 1); return a; };
+    return { pos: cap(pos, 2000), neg: cap(neg, 3000) };
+}
+function circleMeanFeat(c){
+    const W = feats.W, H = feats.H, F = feats.F, v = new Array(NF).fill(0); let n = 0;
+    for (let y=Math.max(0,Math.floor(c.y-c.r)); y<=Math.min(H-1,Math.ceil(c.y+c.r)); y++)
+        for (let x=Math.max(0,Math.floor(c.x-c.r)); x<=Math.min(W-1,Math.ceil(c.x+c.r)); x++)
+            if ((x-c.x)**2+(y-c.y)**2 <= c.r*c.r){ n++; for (let k=0;k<NF;k++) v[k] += F[(y*W+x)*NF+k]; }
+    return n ? v.map(a => a/n) : null;
+}
+$('learn-btn').addEventListener('click', () => {
+    if (!feats){ alert('Nejprve načtěte dlaždici.'); return; }
+    if (!posCircles.length){ alert('Nakreslete aspoň jeden pozitivní kruh (koruna).'); return; }
+    if (!negCircles.length && !$('auto-bg').checked){ alert('Chybí vzorky pozadí: nakreslete negativní kruhy, nebo zaškrtněte „Vše mimo pozitivní kruhy je pozadí".'); return; }
+    statusEl.textContent = 'Učím se…';
+    setTimeout(() => {
+        const s = collectSamples();
+        if (s.pos.length < 20 || s.neg.length < 20){ statusEl.textContent = 'Málo pixelů v kruzích – nakreslete větší kruhy.'; return; }
+        bank[tileKey] = s;
+        const X = [], y = [];
+        Object.values(bank).forEach(b => { b.pos.forEach(v => { X.push(v); y.push(1); }); b.neg.forEach(v => { X.push(v); y.push(0); }); });
+        model = trainMLP(X, y);
+        posCircles.filter(c => c.label).forEach(c => { const v = circleMeanFeat(c); if (v) protos.push({ label:c.label, vec:v }); });
+        const rs = posCircles.map(c => c.r);
+        $('minr').value = Math.max(2, Math.round(Math.min(...rs)*0.5)); $('minr-val').textContent = $('minr').value;
+        $('maxr').value = Math.min(120, Math.round(Math.max(...rs)*1.4)); $('maxr-val').textContent = $('maxr').value;
+        recomputeScore(); recomputeDetect(); render();
+        statusEl.textContent = 'Naučeno z ' + X.length + ' vzorků (' + Object.keys(bank).length + ' dlaždic). Model se přenáší na další dlaždice.';
+        exportConfig();
+    }, 20);
+});
+function exportConfig(){ $('config').value = JSON.stringify({ v:10, posCircles, negCircles, model, protos }); }
+
+// ---------- tlačítka ----------
+$('undo-btn').addEventListener('click', () => {
+    const t = history.pop(); if (!t) return;
+    (t === 'pos' ? posCircles : negCircles).pop();
+    if (t === 'neg'){ recomputeScore(); recomputeDetect(); } evaluate(); render();
+});
+$('det2pos-btn').addEventListener('click', () => {
+    let added = 0;
+    detections.forEach(d => {
+        if (d.group || posCircles.some(c => Math.hypot(d.cx-c.x, d.cy-c.y) <= c.r)) return;
+        posCircles.push({ x:d.cx, y:d.cy, r:d.diam/2, label: d.label.startsWith('(') ? '' : d.label }); history.push('pos'); added++;
+    });
+    statusEl.textContent = 'Přidáno ' + added + ' detekcí jako pozitivní kruhy. Chybné smažte (Zpět) nebo označte negativním kruhem a znovu se učte.';
+    evaluate(); render();
+});
+$('clear-pos').addEventListener('click', () => { posCircles = []; history = history.filter(t => t !== 'pos'); evaluate(); render(); });
+$('clear-neg').addEventListener('click', () => { negCircles = []; history = history.filter(t => t !== 'neg'); recomputeScore(); recomputeDetect(); render(); });
+$('reset-model').addEventListener('click', () => {
+    model = null; protos = []; for (const k in bank) delete bank[k];
+    statusEl.textContent = 'Stav: obecný model (nenaučeno)'; recomputeScore(); recomputeDetect(); render();
+});
+$('import-btn').addEventListener('click', () => {
+    try {
+        const cfg = JSON.parse($('config').value);
+        if (cfg.posCircles) posCircles = cfg.posCircles;
+        if (cfg.negCircles) negCircles = cfg.negCircles;
+        if (cfg.model) model = cfg.model;
+        if (cfg.protos) protos = cfg.protos;
+        history = [];
+        statusEl.textContent = 'Konfigurace načtena' + (cfg.model ? ' včetně modelu.' : ' (bez modelu – učte se tlačítkem).');
+        recomputeScore(); recomputeDetect(); render();
+    } catch(e){ alert('Neplatná konfigurace JSON.'); }
+});
+$('export-btn').addEventListener('click', () => {
+    if (!detections.length){ alert('Žádná data k exportu.'); return; }
+    const gsd = +$('gsd').value, hCoeff = +$('h-coeff').value;
+    const sun = calcSun(parseFloat($('lat').value), +$('month').value, +$('hour').value);
+    const dec = v => v.toFixed(2).replace('.', ',');
+    let csv = '\ufeffID;X_px;Y_px;Prumer_koruny_m;Vyska_odhad_m;Plocha_stinu_m2;Popisek;Bez_listi;Skupina;Na_okraji\n';
+    detections.forEach((d, i) => {
+        const dM = d.diam*gsd, hM = dM*hCoeff, shA = dM*hM*sun.coeff/2;
+        csv += [i+1, Math.round(d.cx), Math.round(d.cy), dec(dM), dec(hM), dec(shA), '"'+d.label+'"',
+                d.leafless?'ano':'ne', d.group?'ano':'ne', d.edge?'ano':'ne'].join(';') + '\n';
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+    a.download = 'agroforest_v10_export.csv'; document.body.appendChild(a); a.click(); a.remove();
+});
+
+// ---------- posuvníky ----------
+let deb = null;
+const detIds = ['thr','minr','maxr','leaf-thr'], viewIds = ['gsd','h-coeff','lat','lon','month','hour'];
+const labels = { thr:'thr-val', minr:'minr-val', maxr:'maxr-val', 'leaf-thr':'leaf-val', gsd:'gsd-val', hour:'hour-val' };
+detIds.concat(viewIds).forEach(id => {
+    $(id).addEventListener('input', () => {
+        if (labels[id]) $(labels[id]).textContent = $(id).value;
+        clearTimeout(deb);
+        deb = setTimeout(() => { if (detIds.includes(id)) recomputeDetect(); render(); }, 80);
+    });
+});
+$('heatmap').addEventListener('change', render);
+</script>
+</body></html>
