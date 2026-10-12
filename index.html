@@ -1,0 +1,119 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A signpost for small useful programs. Rozcestník pro malé užitečné programy.</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            background: #24242e;
+            padding: 40px 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid #333344;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: #8080b6;
+        }
+        
+        h2 {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #8080b6;
+        }
+        p {
+            color: #a0a0b0;
+            margin-bottom: 30px;
+            font-size: 1rem;
+        }
+        .links-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .card-link {
+            display: block;
+            text-decoration: none;
+            background: #2c2c3a;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+        .card-link:hover {
+            border-color: #8080b6;
+            background: #343446;
+            transform: translateY(-2px);
+        }
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 5px;
+        }
+        .card-desc {
+            font-size: 0.9rem;
+            color: #8a8a9e;
+        }
+        footer {
+            margin-top: 30px;
+            font-size: 0.8rem;
+            color: #555566;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>A signpost for small useful programs</h1>
+        <h2>Rozcestník pro malé užitečné programy</h2>
+        <p></p>
+        
+        <div class="links-grid">
+            <!-- Link to the older/basic version folder -->
+            <a href="./combination_of_vegetables/index.html" class="card-link">
+                <div class="card-title">1. Combination of vegetables. Kombinace zeleniny.</div>
+                <div class="card-desc">A combination of vegetables on the flowerbed. Helper for joint cultivation – who thrives next to whom and why. Kombinace zeleniny na záhoně. Pomocník pro společné pěstování — kdo prospívá vedle koho a proč. 🌱</div>
+            </a>
+            
+            <!-- Link to the new advanced version folder -->
+            <a href="./tree_detection/index.html" class="card-link">
+                <div class="card-title">2. Tree detection from the orthophotomap. Detekce stromů z ortofotomapy.</div>
+                <div class="card-desc">Tree detection from the orthophotomap according to texture, shade, shape, etc.. Detekce stromů z ortofotomapy podle textury, odstínu, tvaru atd.</div>
+            </a>
+            
+            <!-- Link to the new advanced version folder -->
+            <a href="./csv_table_combiner/index.html" class="card-link">
+                <div class="card-title">3. Asynchronous CSV table combiner. Asynchronní slučovač CSV tabulek.</div>
+                <div class="card-desc"></div>
+            </a>
+        </div>
+
+
+        <footer>Built with HTML, CSS, and Vanilla JavaScript. Vytvořeno s HTML, CSS a Vanilla JavaScript.</footer>
+    </div>
+
+</body>
+</html>
