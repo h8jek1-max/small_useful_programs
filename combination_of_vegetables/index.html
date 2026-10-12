@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kombinace zeleniny na záhoně</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --soil: #3d2b1f;
+    --leaf: #4a7c3f;
+    --leaf-light: #6aab5e;
+    --leaf-pale: #c8e6c0;
+    --sun: #e8b84b;
+    --sun-pale: #fdf3d0;
+    --parchment: #f8f4ec;
+    --cream: #fdfaf4;
+    --text: #2c1f14;
+    --text-soft: #6b5544;
+    --good: #3d7a35;
+    --good-bg: #eaf5e7;
+    --bad: #a63025;
+    --bad-bg: #faeceb;
+    --neutral: #5a6e7f;
+    --card-shadow: 0 4px 24px rgba(61,43,31,0.10);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ---- HEADER ---- */
+  header {
+    background: var(--soil);
+    padding: 36px 40px 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse at 80% 50%, rgba(74,124,63,0.22) 0%, transparent 60%),
+      radial-gradient(ellipse at 20% 80%, rgba(232,184,75,0.12) 0%, transparent 50%);
+  }
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.7rem, 4vw, 2.8rem);
+    color: var(--sun);
+    position: relative;
+    letter-spacing: 0.01em;
+    line-height: 1.15;
+  }
+  header p {
+    color: rgba(255,255,255,0.62);
+    font-size: 0.95rem;
+    margin-top: 8px;
+    font-weight: 300;
+    position: relative;
+    max-width: 560px;
+  }
+  .header-leaf {
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 5rem;
+    opacity: 0.13;
+    pointer-events: none;
+  }
+
+  /* ---- MAIN LAYOUT ---- */
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px 60px;
+  }
+
+  /* ---- SELECT SECTION ---- */
+  .select-section {
+    background: white;
+    border-radius: 16px;
+    padding: 28px 32px;
+    box-shadow: var(--card-shadow);
+    margin-bottom: 28px;
+    border: 1px solid rgba(74,124,63,0.1);
+  }
+  .select-label {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    color: var(--soil);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .select-label span { font-size: 1.4rem; }
+
+  select {
+    width: 100%;
+    max-width: 420px;
+    padding: 12px 18px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text);
+    background: var(--parchment);
+    border: 2px solid var(--leaf-pale);
+    border-radius: 10px;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234a7c3f' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  select:focus { outline: none; border-color: var(--leaf); box-shadow: 0 0 0 3px rgba(74,124,63,0.15); }
+  select:hover { border-color: var(--leaf-light); }
+
+  /* ---- RESULTS GRID ---- */
+  .results-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 640px) { .results-grid { grid-template-columns: 1fr; } }
+
+  .result-card {
+    background: white;
+    border-radius: 14px;
+    padding: 24px 26px;
+    box-shadow: var(--card-shadow);
+    border-top: 4px solid transparent;
+    display: none;
+    animation: fadeIn 0.3s ease;
+  }
+  .result-card.good { border-top-color: var(--good); display: block; }
+  .result-card.bad  { border-top-color: var(--bad);  display: block; }
+
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+  .result-card h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .result-card.good h3 { color: var(--good); }
+  .result-card.bad  h3 { color: var(--bad);  }
+
+  .plant-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .pill {
+    padding: 5px 13px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .pill:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
+  .pill.good-pill { background: var(--good-bg); color: var(--good); }
+  .pill.bad-pill  { background: var(--bad-bg);  color: var(--bad);  }
+
+  /* ---- INFO CARD ---- */
+  .info-card {
+    background: white;
+    border-radius: 16px;
+    padding: 30px 32px;
+    box-shadow: var(--card-shadow);
+    display: none;
+    animation: fadeIn 0.35s ease;
+    border: 1px solid var(--leaf-pale);
+  }
+  .info-card.visible { display: block; }
+
+  .info-plant-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    color: var(--soil);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .info-plant-name .emoji { font-size: 1.8rem; }
+  .info-subtitle {
+    color: var(--text-soft);
+    font-size: 0.9rem;
+    margin-bottom: 24px;
+    font-style: italic;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .info-block {
+    background: var(--parchment);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .info-block h4 {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-soft);
+    margin-bottom: 7px;
+  }
+  .info-block p {
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: var(--text);
+  }
+
+  .meziplodiny-section {
+    background: linear-gradient(135deg, #f0f9ed 0%, #e8f5e4 100%);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-top: 16px;
+    border-left: 3px solid var(--leaf);
+  }
+  .meziplodiny-section h4 {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.95rem;
+    color: var(--leaf);
+    margin-bottom: 10px;
+  }
+  .mezip-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    margin-bottom: 7px;
+  }
+  .mezip-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-soft);
+    min-width: 70px;
+    padding-top: 3px;
+  }
+  .mezip-plants {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .mezip-pill {
+    background: white;
+    border: 1px solid var(--leaf-pale);
+    color: var(--leaf);
+    padding: 3px 10px;
+    border-radius: 14px;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .tip-box {
+    margin-top: 16px;
+    background: var(--sun-pale);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: #5a4010;
+    border-left: 3px solid var(--sun);
+  }
+  .tip-box strong { color: #3d2a00; }
+
+  /* ---- PLACEHOLDER ---- */
+  .placeholder {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-soft);
+  }
+  .placeholder .big-emoji { font-size: 4rem; margin-bottom: 16px; display: block; }
+  .placeholder p { font-size: 1rem; max-width: 340px; margin: 0 auto; line-height: 1.6; }
+
+  /* ---- FOOTER ---- */
+  footer {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-soft);
+    font-size: 0.82rem;
+    border-top: 1px solid var(--leaf-pale);
+  }
+
+  /* ---- ALL VIEW ---- */
+  .all-view { display: none; }
+  .all-view.visible { display: block; }
+  .all-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    background: white;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+  }
+  .all-table th {
+    background: var(--soil);
+    color: var(--sun);
+    padding: 10px 14px;
+    text-align: left;
+    font-family: 'Playfair Display', serif;
+    font-weight: 400;
+  }
+  .all-table td { padding: 10px 14px; border-bottom: 1px solid var(--leaf-pale); vertical-align: top; }
+  .all-table tr:last-child td { border-bottom: none; }
+  .all-table tr:hover td { background: var(--parchment); }
+  .tag-g { color: var(--good); font-weight: 500; }
+  .tag-b { color: var(--bad); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌿 Kombinace zeleniny na záhoně</h1>
+  <p>Pomocník pro společné pěstování — kdo prospívá vedle koho a proč</p>
+  <div class="header-leaf">🌱</div>
+</header>
+
+<div class="wrap">
+
+  <div class="select-section">
+    <div class="select-label"><span>🥕</span> Vyber zeleninu</div>
+    <select id="plantSelect" onchange="showPlant(this.value)">
+      <option value="">— vyberte zeleninu —</option>
+    </select>
+  </div>
+
+  <div class="results-grid" id="resultsGrid">
+    <div class="result-card" id="goodCard">
+      <h3>✅ Vhodní sousedé</h3>
+      <div class="plant-pills" id="goodList"></div>
+    </div>
+    <div class="result-card" id="badCard">
+      <h3>❌ Nevhodní sousedé</h3>
+      <div class="plant-pills" id="badList"></div>
+    </div>
+  </div>
+
+  <div class="info-card" id="infoCard">
+    <div id="infoContent"></div>
+  </div>
+
+  <div id="placeholderBox" class="placeholder">
+    <span class="big-emoji">🌾</span>
+    <p>Vyberte zeleninu ze seznamu a zobrazí se vhodné a nevhodné kombinace pro společné pěstování, meziplodiny a tipy péče.</p>
+  </div>
+
+</div>
+
+<footer>
+  Kombinace ověřeny dle zahradnické praxe a permakultury · Severní Čechy · verze 2025
+</footer>
+
+<script>
+// ============================================================
+// DATABÁZE ROSTLIN
+// Formát: "název_IDsoused+/-_IDsoused+/-_..."
+// Index v poli = pozice v abecedním pořadí (1-based)
+// ============================================================
+
+const RAW = [
+// 1  brambory
+"brambory_2-_7-_9-_11+_14-_17+_18+_19-_20+_24+_29+_33-_39+",
+// 2  celer
+"celer_1-_11+_12+_17+_19+_21-_27+_29+_32+_33+_37+_39+",
+// 3  cibule
+"cibule_4+_6+_7+_11-_12-_14+_16+_18+_19-_26+_27+_29+_32+_37+",
+// 4  cuketa
+"cuketa_3+_8+_11+_12+_18+_24+_26+_37+_38+",
+// 5  čekanka
+"čekanka_12+_13+_26+_33+_37+",
+// 6  černý kořen
+"černý kořen_3+_17+_26+_32+_37+_38+",
+// 7  červená řepa
+"červená řepa_1-_3+_8+_11+_16+_17+_18+_21-_27+_29+_32-_38+",
+// 8  česnek
+"česnek_4+_7+_11-_12-_14-_16+_19-_26+_27+_28+_33+",
+// 9  čínské zelí
+"čínské zelí_1-_11+_17-_19-_26+_32-_35-_37+_39+",
+// 10 čtyřboč
+"čtyřboč_20+_28+_33+",
+// 11 dýně / tykev
+"dýně / tykev_3+_4+_12+_18+_19+_21+_24+_26+_37+_38+",
+// 12 fazol keříčkový
+"fazol keříčkový_1+_2+_3-_7+_8-_9+_13-_14-_16+_17+_19+_23+_27+_32-_33+_34+_35+_36+_37+_38+",
+// 13 fazol tyčkový
+"fazol tyčkový_2+_3-_4+_5+_8-_11+_13_skip_14-_17+_19+_22+_23+_27+_31+_32-_35+_36+_37+_39+_40+_41+",
+// 14 fenykl
+"fenykl_5+_12-_13-_15+_27+_34-_37+_38+_40+",
+// 15 hrách
+"hrách_1-_3+_8-_12-_13-_14+_17+_18+_19+_25+_26+_32-_34-_35+_36+_37+",
+// 16 chřest
+"chřest_17+_18+_37+_38+",
+// 17 jahodník
+"jahodník_3+_7+_8+_12+_19+_30+_31+_32+_35+_37+_39+",
+// 18 kedluben
+"kedluben_1+_2+_6+_7+_9-_12+_13+_15+_16+_25+_31+_32+_33+_35+_37+_39+",
+// 19 kopr
+"kopr_1+_3+_7+_15+_16+_26+_27+_36+_37+_38+",
+// 20 košťáloviny (zelí, kapusta, brokolice…)
+"košťáloviny_1-_2+_3-_8-_9-_12+_13+_15+_16+_23+_25+_27+_31+_32-_33+_34+_35+_37+_38+_39+_40+",
+// 21 křen
+"křen_1+_10+_28+",
+// 22 kukuřice
+"kukuřice_2-_7-_11+_13+_33+_37+_38+",
+// 23 lichořeříšnice
+"lichořeříšnice_13+_28+_35+",
+// 24 mangold
+"mangold_12+_19+_26+_35+_36+",
+// 25 máta peprná
+"máta peprná_1+_26+_33+_37+",
+// 26 měsíček lékařský
+"měsíček lékařský_15+_18+_20+_27+_33+_36+",
+// 27 mrkev
+"mrkev_3+_5+_6+_8+_9+_15+_19+_23+_24+_32+_33+_35+",
+// 28 okurky
+"okurky_2+_3+_7+_8+_12+_13+_14+_19+_20+_25+_35-_37+",
+// 29 ovocné stromy
+"ovocné stromy_8+_10+_21+_22+",
+// 30 pastinák
+"pastinák_1+_2+_3+_7+_35+_36+_37+_38+_39+",
+// 31 petržel
+"petržel_17+_33+_35+_37-",
+// 32 polníček
+"polníček_13+_17+_18+_20+_32+_34+",
+// 33 pórek
+"pórek_2+_3+_6+_7-_9-_12-_13-_15-_17+_18-_20+_26+_31+_33+_37+_40+",
+// 34 rajčata
+"rajčata_1-_2+_5+_8+_10+_12+_14-_15-_18+_20+_22+_25+_26+_27+_31+_32+_35+_36+_37+_38+_39+",
+// 35 reveň
+"reveň_12+_20+_31+_37+_38+_39+",
+// 36 ředkvička / ředkev
+"ředkvička / ředkev_9-_12+_13+_15+_17+_18+_20+_23+_24+_26+_27-_30+_31+_33+_37+_38+_39+",
+// 37 řepy (cukrová, krmná)
+"řepy_12+_13+_15+_19+_23+_25+_30+_33+_37+_38+_39+",
+// 38 salát hlávkový
+"salát hlávkový_2+_3+_5+_6+_9+_12+_13+_14+_15+_16+_18+_19+_22+_25+_28+_30-_32+_33+_34+_35+_36+",
+// 39 salát k česání
+"salát k česání_6+_7+_12+_14+_16+_19+_30+_33+_34+_35+_36+",
+// 40 špenát
+"špenát_1+_2+_9+_13+_17+_18+_20+_30+_33+_34+_35+_36+",
+// 41 štěrbák (endivie)
+"štěrbák_13+_14+_20+_32+",
+// 42 paprika
+"paprika_8+_15+_25+_26+_33+_34+_37+_38+",
+// 43 lilek
+"lilek_2+_8+_25+_26+_33+_38+"
+];
+
+// ============================================================
+// EXTRA INFO o každé rostlině
+// ============================================================
+const INFO = {
+  "brambory": {
+    emoji:"🥔", latName:"Solanum tuberosum",
+    popis:"Nenáročné hlízoviny, největší odběratelé draslíku a fosforu. V bezorebném systému se pokládají na půdu pod mulč.",
+    veg:"90–120 dní", kličení:"14–21 dní (hlízy)", spon:"30–35 cm / řady 60 cm",
+    mezipred:["hořčice bílá","pohanka","oves"],
+    mezibehem:["kopr (odpuzuje mandelinku)","křen"],
+    mezipo:["svazenka","jetel inkarnát","ozimý špenát"],
+    tip:"Nikdy po rajčatech, lilku ani paprikách — sdílejí plíseň bramborovou. Výborné po zeleném hnojení z jetele."
+  },
+  "celer": {
+    emoji:"🌿", latName:"Apium graveolens",
+    popis:"Silně aromatický, odpuzuje škůdce od okolních rostlin. Potřebuje vlhkou, výživnou půdu a dlouhou sezónu.",
+    veg:"150–180 dní", kličení:"14–21 dní", spon:"30–40 cm",
+    mezipred:["špenát","polníček"],
+    mezibehem:["salát hlávkový (podrost)"],
+    mezipo:["hořčice","svazenka"],
+    tip:"Přísadí vedle rajčat vzájemně si prospívají. Celer odpuzuje bělásky, rajčata zlepšují chuť celeru. Náročný na dusík — předchozí rok zelené hnojení z vojtěšky."
+  },
+  "cibule": {
+    emoji:"🧅", latName:"Allium cepa",
+    popis:"Silná vůně síry odpuzuje škůdce mnoha sousedů. Nesnáší čerstvý hnůj. Sází se jako sazečka nebo výsev.",
+    veg:"100–140 dní", kličení:"7–12 dní", spon:"8–10 cm / řady 20 cm",
+    mezipred:["hořčice bílá","polníček"],
+    mezibehem:["mrkev (klasická dvojka — cibule odpuzuje pochmurnatku mrkvovou)"],
+    mezipo:["ozimý česnek","polníček","špenát"],
+    tip:"Nesázej s fazolemi, hráchem ani česnekem — soutěžní příbuzní. Po cibuli je výborná mrkev nebo salát."
+  },
+  "cuketa": {
+    emoji:"🥒", latName:"Cucurbita pepo var. cylindrica",
+    popis:"Keříčkový tykvonitý, obří listy rychle stíní půdu a drží vlhkost. Velmi produktivní za příznivých podmínek.",
+    veg:"50–65 dní (do sklizně)", kličení:"5–8 dní", spon:"70–80 cm",
+    mezipred:["špenát","ředkvičky","salát"],
+    mezibehem:["bazalka","máta","cibule"],
+    mezipo:["svazenka","pohanka"],
+    tip:"Vynikající kombinace s fazolemi tyčkovými a dýněmi (kukuřice+fazole+tykev = Tři sestry). Pozor na křížení s ostatními tykvonitými při semenaření."
+  },
+  "dýně / tykev": {
+    emoji:"🎃", latName:"Cucurbita maxima / C. moschata",
+    popis:"Srdce klasické indiánské kombinace Tří sester. Obrovské listy kompletně zakryjí půdu, drží vlhkost a brání plevelu.",
+    veg:"90–120 dní", kličení:"5–9 dní", spon:"100–150 cm",
+    mezipred:["špenát","ředkvičky","salát"],
+    mezibehem:["fazol tyčkový (fixuje dusík), kukuřice (opora pro fazole)"],
+    mezipo:["svazenka","pohanka — vymrzají a tvoří mulč"],
+    tip:"Tři sestry: kukuřice (opora) + fazol tyčkový (dusík) + dýně (mulč z listů). Tato kombinace funguje přes 3000 let. Pro semenaření nutná izolace od cuket — snadno se kříží."
+  },
+  "čekanka": {
+    emoji:"🌸", latName:"Cichorium intybus",
+    popis:"Hlubokokoření — vytahuje minerály z podloží. Odolná, nenáročná víceletá bylina s hořčinou, která stimuluje trávení.",
+    veg:"70–90 dní (listy)", kličení:"7–14 dní", spon:"25–30 cm",
+    mezipred:["špenát","polníček"],
+    mezibehem:["mrkev","salát"],
+    mezipo:["hořčice"],
+    tip:"Výborný pomocník na těžších severočeských půdách — kořeny mechanicky rozrušují podloží."
+  },
+  "černý kořen": {
+    emoji:"🖤", latName:"Scorzonera hispanica",
+    popis:"Víceletá zelenina s hlubokými kořeny, bohatá na inulin. Velmi tolerantní k chladu. Jednou vysazená, sklízíš roky.",
+    veg:"120–180 dní (1. rok)", kličení:"14–21 dní", spon:"10–15 cm / řady 30 cm",
+    mezipred:["špenát","polníček"],
+    mezibehem:["kedluben","salát"],
+    mezipo:["hořčice","jetel"],
+    tip:"Vynikající pro severní Čechy — odolný mrázu. Nechejte část na semeno — kvete druhý rok nádherně žlutě."
+  },
+  "červená řepa": {
+    emoji:"🟣", latName:"Beta vulgaris var. conditiva",
+    popis:"Dvojletá, bohatá na betain. Listy jsou jedlé jako mangold. Nekompatibilní s fazolemi kvůli alelopatii.",
+    veg:"55–70 dní", kličení:"7–14 dní", spon:"10–15 cm / řady 25–30 cm",
+    mezipred:["salát","špenát"],
+    mezibehem:["cibule","česnek"],
+    mezipo:["hořčice","svazenka"],
+    tip:"Semeno řepy je ve skutečnosti shluk 2–4 semen — po vzejití vyjednotit na 10 cm. Listy přidávej do salátů nebo dušených pokrmů."
+  },
+  "česnek": {
+    emoji:"🧄", latName:"Allium sativum",
+    popis:"Přirozené antimykotikum a baktericid. Chrání okolní rostliny před houbovými chorobami. Sází se na podzim.",
+    veg:"240+ dní (ozimý)", kličení:"10–14 dní (kořeny)", spon:"10–12 cm / řady 25 cm",
+    mezipred:["polníček"],
+    mezibehem:["jahody (chrání před šedou plísní)","mrkev"],
+    mezipo:["salát","špenát"],
+    tip:"Nikdy nesázej vedle fazolí a hrachu — inhibuje jejich růst. Po česneku je výborná mrkev nebo salát. Sázej na podzim hluboko (5–8 cm) špičkou nahoru."
+  },
+  "čínské zelí": {
+    emoji:"🥬", latName:"Brassica rapa subsp. pekinensis",
+    popis:"Rychlorostoucí košťálovitá zelenina. Náchylná na bolení — sázej jen na podzim nebo brzy zjara.",
+    veg:"45–70 dní", kličení:"4–6 dní", spon:"30–40 cm",
+    mezipred:["špenát","polníček"],
+    mezibehem:["salát","ředkvičky (jako lapací plodina)"],
+    mezipo:["hořčice","svazenka"],
+    tip:"Typická chyba je letní setí — okamžitě vybíhá do semene. Sej v srpnu na podzimní sklizeň."
+  },
+  "fazol keříčkový": {
+    emoji:"🫘", latName:"Phaseolus vulgaris",
+    popis:"Fixuje vzdušný dusík pomocí hlízkových bakterií. Obohacuje půdu pro příští rok. Nejjednodušší na pěstování.",
+    veg:"55–70 dní", kličení:"7–10 dní", spon:"8–10 cm / řady 35–40 cm",
+    mezipred:["špenát","polníček","ředkvičky"],
+    mezibehem:["saturejka (chrání před mšicemi a zlepšuje chuť)"],
+    mezipo:["ozimý špenát","polníček","jetel"],
+    tip:"Sej teprve po zmrzlých (po 15. 5.) — nesnáší studenou půdu. Nikdy nesázej vedle česneku, cibule ani hrachu (soutěžní fixátoři). Po sklizni kořeny nechej v půdě."
+  },
+  "fazol tyčkový": {
+    emoji:"🌱", latName:"Phaseolus vulgaris (var.)",
+    popis:"Klíčový člen Tří sester — šplhá po kukuřici a fixuje dusík pro celou skupinu. Produkuje déle než keříčkový.",
+    veg:"65–80 dní", kličení:"7–10 dní", spon:"20–25 cm (u opory)",
+    mezipred:["špenát","salát","ředkvičky"],
+    mezibehem:["kukuřice (opora) + dýně (mulč) = Tři sestry","saturejka"],
+    mezipo:["ozimý špenát","polníček","jetel inkarnát"],
+    tip:"Tři sestry: kukuřice jako tyč, fazol šplhá po ní a fixuje dusík, dýně zakryje půdu listy. Vysazuj kukuřici 2–3 týdny před fazolemi, aby byla dost vysoká jako opora."
+  },
+  "fenykl": {
+    emoji:"🌾", latName:"Foeniculum vulgare",
+    popis:"Silně alelopatická rostlina — inhibuje růst mnoha zelenin. Pěstuj jej odděleně nebo na okraji záhonu.",
+    veg:"90–120 dní", kličení:"10–14 dní", spon:"40–50 cm",
+    mezipred:["hořčice"],
+    mezibehem:["čekanka (tolerantní sousedi)"],
+    mezipo:["svazenka"],
+    tip:"POZOR: Fenykl je jeden z nejvíce alelopatických druhů — pěstuj minimálně 60 cm od ostatní zeleniny nebo ve vlastním záhonu."
+  },
+  "hrách": {
+    emoji:"🟢", latName:"Pisum sativum",
+    popis:"Rychlý fixátor dusíku, ideální předplodina pro košťáloviny a košťáloviny. Nesnáší teplotní výkyvy nad 25 °C.",
+    veg:"60–85 dní", kličení:"7–10 dní", spon:"4–6 cm / řady 20–30 cm",
+    mezipred:["polníček","ozimý špenát"],
+    mezibehem:["kedluben (dusík z hrachu)","salát (podrost)"],
+    mezipo:["košťáloviny (využijí dusík)","hlávkové zelí","pórek"],
+    tip:"Sej hned jak rozmrzne půda — hrách miluje chlad a sníh mu nevadí. Po sklizni kořeny nechej v zemi (dusík!). Výborná předplodina pro košťáloviny."
+  },
+  "chřest": {
+    emoji:"🌿", latName:"Asparagus officinalis",
+    popis:"Víceletá vytrvalá zelenina, jednou vysazená produkuje 20+ let. První sklizeň až 3. rok po výsadbě.",
+    veg:"Vytrvalá — sezónní výhonky", kličení:"21–30 dní", spon:"30–40 cm / řady 60–90 cm",
+    mezipred:["polníček","hořčice"],
+    mezibehem:["petržel","bazalka","měsíček"],
+    mezipo:["hořčice","jetel"],
+    tip:"Vyhraď mu stálé místo na okraji záhonu — nerotuje. Roste nejlépe na lehčí písčité půdě. V severních Čechách vynikne na jižně orientovaných svazích."
+  },
+  "jahodník": {
+    emoji:"🍓", latName:"Fragaria × ananassa",
+    popis:"Nízký, rychle pokrývá půdu. Česnek sousedící s jahodníkem chrání před šedou plísní. Víceletá kultura.",
+    veg:"Vytrvalá", kličení:"výběžky / sazenice", spon:"25–30 cm",
+    mezipred:["česnek (ozimý, zasadit vedle na podzim)"],
+    mezibehem:["česnek","špenát","cibule"],
+    mezipo:["ozimý česnek (mezi řadami)"],
+    tip:"Klasická kombinace: jahodník + česnek. Česnek odpuzuje houby (šedá plíseň) a mšice. Po sklizni zkombinuj s polníčkem pro zimní pokryv."
+  },
+  "kedluben": {
+    emoji:"🟢", latName:"Brassica oleracea var. gongylodes",
+    popis:"Rychlá košťálovitá zelenina, sklizeň za pouhých 6–8 týdnů. Výborná jako předplodina nebo meziplodina.",
+    veg:"50–70 dní", kličení:"5–7 dní", spon:"20–25 cm",
+    mezipred:["špenát","polníček"],
+    mezibehem:["hrách (dusík)","salát (podrost)"],
+    mezipo:["špenát","polníček","hořčice"],
+    tip:"Skvělá pro rychlé zaplnění prázdných míst. Nechej na záhoně po sklizni hrachu — využije uvolněný dusík."
+  },
+  "kopr": {
+    emoji:"🌿", latName:"Anethum graveolens",
+    popis:"Silná bylina, která láká dravý hmyz (zlatoočky, lumky). Zlepšuje chuť brambor a brání mnohým škůdcům.",
+    veg:"70–90 dní", kličení:"7–14 dní", spon:"20–30 cm",
+    mezipred:["hořčice"],
+    mezibehem:["mrkev","okurky","salát"],
+    mezipo:["svazenka"],
+    tip:"Nechtěně se semení — nechej 1–2 rostliny vysemenit v množitelském koutku. Vynikající k okurkám a mrkvě. Odvar z kopru odpuzuje mšice."
+  },
+  "košťáloviny": {
+    emoji:"🥦", latName:"Brassica oleracea spp.",
+    popis:"Zelí, kapusta, brokolice, květák — velcí žrouti dusíku. Patří do I. tratě. Po hrachu nebo fazolích jsou výborné.",
+    veg:"80–150 dní", kličení:"4–7 dní", spon:"40–60 cm",
+    mezipred:["hrách","fazol keříčkový (dusík v půdě)"],
+    mezibehem:["kopr","máta","měsíček (odpuzují běláskovce)","yzop"],
+    mezipo:["ozimý špenát","polníček","hořčice bílá"],
+    tip:"Výborná lapací rostlina vedle košťálovin: lichořeříšnice — přiláká mšice na sebe a odvrátí je od brokolice. Nikdy opakuj na stejném místě dříve než za 4 roky!"
+  },
+  "křen": {
+    emoji:"🌱", latName:"Armoracia rusticana",
+    popis:"Mohutná vytrvalá rostlina — jednou zasazena zůstane navždy. Chrání okolní rostliny před chorobami.",
+    veg:"Vytrvalá", kličení:"výsadba kořenů", spon:"50 cm",
+    mezipred:["hořčice"],
+    mezibehem:["brambory (ochrana před plísní)"],
+    mezipo:["jetel"],
+    tip:"Sázej na úplný okraj záhonu — šíří se velmi agresivně kořeny. Malý kousek kořene zasazen rohově postačí pro celý záhon brambor."
+  },
+  "kukuřice": {
+    emoji:"🌽", latName:"Zea mays",
+    popis:"Klíčová opora Tří sester — fazol tyčkový šplhá po stéblu, dýně stíní půdu pod ní. Potřebuje teplo.",
+    veg:"80–100 dní", kličení:"7–10 dní", spon:"25–30 cm / řady 50 cm",
+    mezipred:["špenát","salát"],
+    mezibehem:["fazol tyčkový (3 sestry — fixuje dusík)","dýně/tykev (3 sestry — mulč)","ředkvičky (pod kukuřicí)"],
+    mezipo:["hořčice bílá","svazenka","pohanka"],
+    tip:"V severních Čechách vybírej rané odrůdy (FAO 100–200). Kukuřice opyluje větrem — sázej do čtverce (min. 4×4 řady), ne do jednoho řádku."
+  },
+  "lichořeříšnice": {
+    emoji:"🌸", latName:"Tropaeolum majus",
+    popis:"Lapací rostlina — přivábi mšice, běláskovce a svilušky na sebe a odvrátí je od cenné zeleniny.",
+    veg:"50–70 dní", kličení:"10–14 dní", spon:"25–30 cm",
+    mezipred:["hořčice"],
+    mezibehem:["košťáloviny (ochrana)","okurky","fazol tyčkový"],
+    mezipo:["polníček"],
+    tip:"Celá rostlina je jedlá — květy do salátů, semena jako kapary. Sej přímo na záhon vedle košťálovin v dubnu."
+  },
+  "mangold": {
+    emoji:"🌿", latName:"Beta vulgaris var. cicla",
+    popis:"Robustní listová zelenina, odolná chladu. Příbuzný řepy — nesmí přijít do kontaktu po sobě na stejném záhoně.",
+    veg:"55–70 dní", kličení:"7–14 dní", spon:"25–30 cm",
+    mezipred:["špenát","polníček"],
+    mezibehem:["cibule","česnek","salát (podrost)"],
+    mezipo:["ozimý špenát","hořčice"],
+    tip:"Výdrž v záhoně přes celou zimu do silných mrazů. Vynikající ve III. tratě. Dvouletý — na semeno nech přezimovat."
+  },
+  "máta peprná": {
+    emoji:"🌿", latName:"Mentha × piperita",
+    popis:"Silně expanzivní bylina — sázej do hrnce zakopaného v zemi. Odpuzuje mravence, mšice a mnohé škůdce.",
+    veg:"Vytrvalá", kličení:"výsadba výběžků", spon:"v nádobě!",
+    mezipred:["polníček"],
+    mezibehem:["brambory (odpuzuje mandelinku)","mrkev (odpuzuje pochmurnatku)"],
+    mezipo:["jetel"],
+    tip:"NIKDY nesázej volně — obsadí celý záhon za 2 roky. Zakop hrnec/nádobu bez dna do záhonu. Odvar z máty postřikuj jako repelent."
+  },
+  "měsíček lékařský": {
+    emoji:"🌼", latName:"Calendula officinalis",
+    popis:"Mocná ochranná rostlina — kořeny vylučují látky odpuzující háďátka a mšice. Láká opylovače.",
+    veg:"60–80 dní", kličení:"7–14 dní", spon:"20–25 cm",
+    mezipred:["hořčice bílá"],
+    mezibehem:["rajčata (ochrana)","košťáloviny","mrkev"],
+    mezipo:["ozimý špenát","polníček"],
+    tip:"Sázej na okraj záhonu kolem rajčat — standardní praxe v biozahradách. Kvete celé léto, láká opylovače a predátory škůdců."
+  },
+  "mrkev": {
+    emoji:"🥕", latName:"Daucus carota subsp. sativus",
+    popis:"Dvouletka — pro semenaření nutno přezimovat kořen. Hluboce koření a uvolňuje zhutnělé podloží pro mělčeji kořenící sousedy.",
+    veg:"120–150 dní", kličení:"12–21 dní", spon:"3–5 cm / řady 20–25 cm",
+    mezipred:["salát","polníček","špenát"],
+    mezibehem:["cibule (klasická dvojka)","česnek","ředkvičky (značkovače a stíní před vyschnutím)"],
+    mezipo:["ozimý česnek","hořčice bílá","polníček"],
+    tip:"Mrkev klíčí velmi pomalu — nesmi vyschnout! Ředkvičky jako průvodkyně: vzejdou za 3–5 dní, ukážou řádky a sklídíš je dřív než mrkev zaujme místo."
+  },
+  "okurky": {
+    emoji:"🥒", latName:"Cucumis sativus",
+    popis:"Plodová zelenina s vysokou potřebou vody. Mýlí se s cuketou — jsou různé rody a nesíží se. Bazalka zlepšuje jejich chuť.",
+    veg:"55–70 dní", kličení:"5–8 dní", spon:"40–50 cm (na drátěnce méně)",
+    mezipred:["salát","špenát","ředkvičky"],
+    mezibehem:["bazalka (chuť + odpuzuje mšice)","kopr","ředkvičky (odláká hadovitku okurkovitou)"],
+    mezipo:["hořčice bílá","svazenka"],
+    tip:"Nikdy po okurkách opět okurky — háďátka a padlí. Ředkvička jako odstrašující prostředek hadovitky okurkovitou — klasický trik."
+  },
+  "ovocné stromy": {
+    emoji:"🍎", latName:"různé rody",
+    popis:"Základní struktura zahrady. Pod ovocnými stromy je skvělé pěstovat mateřídoušku, jetel nebo zahradní borůvky.",
+    veg:"Vytrvalé", kličení:"výsadba stromků", spon:"dle druhu 3–8 m",
+    mezipred:["hořčice bílá (na zelené hnojení pod stromy)"],
+    mezibehem:["jetel plazivý (mulč + dusík)","česnek (ochrana)","máta (odpuzuje mšice)"],
+    mezipo:["jetel plazivý"],
+    tip:"Pod ovocné stromy sázej česnek a mátu — ochrana před houbovými chorobami. Vysekávej trávu a nech ji ležet jako mulč místo odvážení."
+  },
+  "pastinák": {
+    emoji:"🟡", latName:"Pastinaca sativa",
+    popis:"Dvouletka — klíčí pomalu, ale pak roste silně. Velmi mrazuvzdorný — může přezimovat v půdě. Sladký po prvním mrazu.",
+    veg:"120–150 dní", kličení:"14–21 dní", spon:"10 cm / řady 30 cm",
+    mezipred:["salát (kryje půdu během klíčení)","polníček"],
+    mezibehem:["salát k řezu (podrost)"],
+    mezipo:["hořčice","jetel"],
+    tip:"Nechej část přezimovat — na semeno i na jarní sklizeň (chuť se po mrazu zlepší). Semena jsou krátkodobě klíčivá — kupuj vždy čerstvá (max 1 rok)."
+  },
+  "petržel": {
+    emoji:"🌿", latName:"Petroselinum crispum",
+    popis:"Dvouletka — první rok listy, druhý rok semeno. Bylina i zelenina. Biennial — pro semeno nutná přezimování.",
+    veg:"70–90 dní (listy)", kličení:"14–24 dní", spon:"15–20 cm",
+    mezipred:["špenát","polníček"],
+    mezibehem:["rajčata (vzájemně prospívají)","chřest"],
+    mezipo:["ozimý špenát","polníček"],
+    tip:"Klíčí velmi pomalu — nevzdávej se do 3 týdnů. Zalévání teplou vodou urychluje klíčení. Nechej 2 rostliny přezimovat na semeno — druhý rok vytvoří vysoké okolíky plné semen."
+  },
+  "polníček": {
+    emoji:"🍀", latName:"Valerianella locusta",
+    popis:"Zimní zelenina odolná mrazu do –15 °C. Výborná předplodina — nechá záhon zelený přes zimu.",
+    veg:"40–60 dní", kličení:"7–14 dní", spon:"8–10 cm",
+    mezipred:["hořčice bílá (letní)"],
+    mezibehem:["salát hlávkový","špenát"],
+    mezipo:["ozimý česnek (podsev)"],
+    tip:"Sey v srpnu–září pro zimní sklizeň. Výborná jako podrost pod košťálovinami nebo podsev u česneku. Semeno klíčí jen za chladu — nevysévej přes léto."
+  },
+  "pórek": {
+    emoji:"🧅", latName:"Allium porrum",
+    popis:"Pomalu rostoucí cibulovina — do záhonu jde jako sazenice. Přezimuje v půdě. Výborný podzimní a zimní záhon.",
+    veg:"150–180 dní", kličení:"14–21 dní", spon:"15 cm / řady 30 cm",
+    mezipred:["hořčice bílá","polníček"],
+    mezibehem:["mrkev (klasická kombinace — vzájemná ochrana)","celer kořenový"],
+    mezipo:["polníček","ozimý špenát"],
+    tip:"Nikdy spolu s hráchem, fazolemi, čínským zelím a pórkem dalším rokem. Výborná kombinace s mrkví — odháněj se navzájem od škůdců."
+  },
+  "rajčata": {
+    emoji:"🍅", latName:"Solanum lycopersicum",
+    popis:"Nejoblíbenější zahradní zelenina. Společně s bazalkou a celerem tvoří dokonalé sousedství. Nikdy po bramborách!",
+    veg:"110–130 dní", kličení:"6–10 dní", spon:"50–60 cm",
+    mezipred:["špenát","ředkvičky","salát (podrost)"],
+    mezibehem:["bazalka (odpuzuje mšice, zlepšuje chuť)","celer","měsíček (ochrana)","petržel"],
+    mezipo:["ozimý špenát","jetel plazivý (podsev v srpnu pod rajčata)"],
+    tip:"V srpnu sej pod rajčata jetel plazivý nebo špenát — když rajčata v říjnu ustřihneš, záhon je již zelený. Kořeny nechej vždy v půdě shnít!"
+  },
+  "reveň": {
+    emoji:"🌿", latName:"Rheum rhabarbarum",
+    popis:"Vytrvalá, jednou vysazená funguje desítky let. Listy jsou jedovaté — jez jen řapíky. Ideální pro okraj záhonu.",
+    veg:"Vytrvalá — sklizeň od 2. roku", kličení:"výsadba pupenů", spon:"1 m",
+    mezipred:["polníček (zimní pokryv kolem reveně)"],
+    mezibehem:["fazol keříčkový (dusík)","špenát"],
+    mezipo:["jetel plazivý"],
+    tip:"Nikdy nesklízej více než 1/3 listů v jedné sezóně. Výborné na okraji záhonu — stálé místo mimo rotaci."
+  },
+  "ředkvička / ředkev": {
+    emoji:"🔴", latName:"Raphanus sativus",
+    popis:"Nejrychlejší plodina — sklizeň za 3–5 týdnů. Vynikající jako průvodce a značkovač pomaluji klíčících plodin.",
+    veg:"25–45 dní", kličení:"3–5 dní", spon:"3–5 cm / řady 15 cm",
+    mezipred:["polníček","špenát"],
+    mezibehem:["mrkev (průvodkyně)","salát","petržel"],
+    mezipo:["hořčice bílá","svazenka"],
+    tip:"Klasický trik: sej ředkvičky do řad mrkve. Vzejdou za 3 dny, ukážou řádky, sklidíš je za 4 týdny a mrkev pak zaujme celý prostor."
+  },
+  "řepy": {
+    emoji:"🌱", latName:"Beta vulgaris",
+    popis:"Krmná/cukrová řepa — náročná na prostor ale výborná v polykultuře s fazolemi. Dvojletá — semeno druhý rok.",
+    veg:"80–120 dní", kličení:"7–14 dní", spon:"25–30 cm",
+    mezipred:["salát","špenát"],
+    mezibehem:["fazol keříčkový (fixuje dusík)","salát"],
+    mezipo:["hořčice","ozimý špenát"],
+    tip:"Semena řepy jsou shluk — vyjednotit! Výborná ve III. tratě vedle fazolí a salátu."
+  },
+  "salát hlávkový": {
+    emoji:"🥬", latName:"Lactuca sativa var. capitata",
+    popis:"Rýchlá, stínotolerantní zelenina — skvělý podrost nebo meziplodina. Nesnáší vedro — v létě vybíhá do semene.",
+    veg:"60–80 dní", kličení:"4–7 dní", spon:"25–30 cm šachovnice",
+    mezipred:["polníček","ozimý špenát"],
+    mezibehem:["mrkev (stíní půdu)","rajčata (podrost)","okurky","košťáloviny"],
+    mezipo:["hořčice bílá","polníček"],
+    tip:"Sej ve vlnách každé 2–3 týdny od dubna do června a znovu od srpna — vyhnout se letnímu výběhu do semene. Nechej 2 rostliny vykvést na semeno."
+  },
+  "salát k česání": {
+    emoji:"🥗", latName:"Lactuca sativa var. crispa",
+    popis:"Nehlávkující trhací salát — sklízeš postupně listy. Odolnější vůči teplu než hlávkový. Výborný podrost.",
+    veg:"40–60 dní (první trhání)", kličení:"4–7 dní", spon:"20–25 cm",
+    mezipred:["polníček"],
+    mezibehem:["rajčata (podrost)","košťáloviny","mrkev"],
+    mezipo:["polníček","hořčice"],
+    tip:"V hustém sponu nebo jako podrost pod rajčaty — pokrývá půdu a drží vlhkost. Sklízej vnější listy a rostlina obnovuje."
+  },
+  "špenát": {
+    emoji:"🥬", latName:"Spinacia oleracea",
+    popis:"Rychlá předplodina a podzimní meziplodina. Bohatý na železo, oxalát. V létě rychle vybíhá do semene.",
+    veg:"40–60 dní", kličení:"5–9 dní", spon:"8–10 cm / řady 20 cm",
+    mezipred:["polníček"],
+    mezibehem:["rajčata (podrost)","košťáloviny","mrkev"],
+    mezipo:["hořčice bílá","ozimý česnek (podsev)"],
+    tip:"Sej na podzim i na jaře — miluje chlad. Výborný podsev pod rajčata v srpnu: když rajčata odklízíš, záhon je zelený. Dvouletky semení se druhý rok."
+  },
+  "štěrbák": {
+    emoji:"🥬", latName:"Cichorium endivia",
+    popis:"Endivie — hořká listová zelenina z čeledi čekankovitých. Odolná chladu, výborná podzimní sklizeň.",
+    veg:"80–100 dní", kličení:"7–10 dní", spon:"30 cm",
+    mezipred:["polníček","špenát"],
+    mezibehem:["salát hlávkový","fazol tyčkový"],
+    mezipo:["polníček","hořčice"],
+    tip:"Sej v červenci–srpnu pro podzimní sklizeň. Při zbělání (zakrytím) se zmírní hořkost."
+  },
+  "paprika": {
+    emoji:"🌶️", latName:"Capsicum annuum",
+    popis:"Teplomilná zelenina — v severních Čechách nejlépe ve fóliovníku nebo krytém záhonu. Potřebuje dlouhou sezónu.",
+    veg:"120–150 dní", kličení:"10–14 dní (21–25 °C)", spon:"40–50 cm",
+    mezipred:["salát","špenát","ředkvičky"],
+    mezibehem:["bazalka (odpuzuje mšice)","měsíček","mrkev"],
+    mezipo:["ozimý špenát","hořčice bílá"],
+    tip:"Předpěstuj od února — paprika potřebuje nejdelší přípravu ze všech zelenin. V severních Čechách preferuj raná hybridní F1 nebo drobné odrůdy. Kombinuj s rajčaty."
+  },
+  "lilek": {
+    emoji:"🍆", latName:"Solanum melongena",
+    popis:"Teplo milující lilek je nejnáročnější zelenina na sezónu. V SV Čechách úspěšný jen s ochranou. Příbuzný rajčatům a bramborám.",
+    veg:"130–160 dní", kličení:"10–14 dní (24–28 °C)", spon:"50–60 cm",
+    mezipred:["salát","ředkvičky"],
+    mezibehem:["bazalka","měsíček (ochrana před molice)","mrkev"],
+    mezipo:["hořčice bílá","špenát"],
+    tip:"Nikdy po bramborách, rajčatech ani paprikách — sdílejí plíseň bramborovou a wilt. Potřebuje nejteplejší místo na záhoně, ideálně u zdi orientované na jih."
+  }
+};
+
+// ============================================================
+// PARSOVÁNÍ DAT
+// ============================================================
+const plants = [];
+RAW.forEach((entry, idx) => {
+  const parts = entry.split("_");
+  const name = parts[0];
+  const good = [], bad = [];
+  for (let i = 1; i < parts.length; i++) {
+    const p = parts[i];
+    if (!p || p.length < 2) continue;
+    const sign = p[p.length - 1];
+    const num = parseInt(p.slice(0, -1));
+    if (isNaN(num) || (sign !== '+' && sign !== '-')) continue;
+    if (sign === '+') good.push(num);
+    else bad.push(num);
+  }
+  plants.push({ name, good, bad, idx: idx + 1 });
+});
+
+// Build name lookup
+const nameByIdx = {};
+plants.forEach(p => nameByIdx[p.idx] = p.name);
+
+// ============================================================
+// POPULATE SELECT
+// ============================================================
+const sel = document.getElementById('plantSelect');
+plants.forEach((p, i) => {
+  const opt = document.createElement('option');
+  opt.value = i;
+  opt.textContent = (INFO[p.name] ? INFO[p.name].emoji + ' ' : '') + p.name;
+  sel.appendChild(opt);
+});
+
+// ============================================================
+// SHOW PLANT
+// ============================================================
+function showPlant(val) {
+  if (val === '') {
+    document.getElementById('goodCard').className = 'result-card';
+    document.getElementById('badCard').className = 'result-card';
+    document.getElementById('infoCard').className = 'info-card';
+    document.getElementById('placeholderBox').style.display = 'block';
+    return;
+  }
+  document.getElementById('placeholderBox').style.display = 'none';
+
+  const p = plants[parseInt(val)];
+  
+  // Good list
+  const goodCard = document.getElementById('goodCard');
+  const badCard = document.getElementById('badCard');
+  const goodList = document.getElementById('goodList');
+  const badList = document.getElementById('badList');
+
+  goodList.innerHTML = '';
+  badList.innerHTML = '';
+
+  p.good.forEach(idx => {
+    const n = nameByIdx[idx];
+    if (!n) return;
+    const pill = document.createElement('button');
+    pill.className = 'pill good-pill';
+    const info = INFO[n];
+    pill.textContent = (info ? info.emoji + ' ' : '') + n;
+    pill.onclick = () => {
+      const pi = plants.findIndex(x => x.name === n);
+      if (pi >= 0) {
+        sel.value = pi;
+        showPlant(pi);
+        window.scrollTo({top: 0, behavior: 'smooth'});
+      }
+    };
+    goodList.appendChild(pill);
+  });
+
+  p.bad.forEach(idx => {
+    const n = nameByIdx[idx];
+    if (!n) return;
+    const pill = document.createElement('button');
+    pill.className = 'pill bad-pill';
+    const info = INFO[n];
+    pill.textContent = (info ? info.emoji + ' ' : '') + n;
+    pill.onclick = () => {
+      const pi = plants.findIndex(x => x.name === n);
+      if (pi >= 0) {
+        sel.value = pi;
+        showPlant(pi);
+        window.scrollTo({top: 0, behavior: 'smooth'});
+      }
+    };
+    badList.appendChild(pill);
+  });
+
+  goodCard.className = 'result-card' + (p.good.length ? ' good' : '');
+  badCard.className  = 'result-card' + (p.bad.length  ? ' bad'  : '');
+
+  // Info card
+  const info = INFO[p.name];
+  const infoCard = document.getElementById('infoCard');
+  const infoContent = document.getElementById('infoContent');
+
+  if (info) {
+    infoContent.innerHTML = `
+      <div class="info-plant-name">
+        <span class="emoji">${info.emoji}</span>
+        ${p.name}
+      </div>
+      <div class="info-subtitle">${info.latName}</div>
+      <div class="info-grid">
+        <div class="info-block">
+          <h4>🌱 Popis</h4>
+          <p>${info.popis}</p>
+        </div>
+        <div class="info-block">
+          <h4>📅 Vegetační doba</h4>
+          <p>${info.veg}</p>
+        </div>
+        <div class="info-block">
+          <h4>🕐 Klíčení</h4>
+          <p>${info.kličení}</p>
+        </div>
+        <div class="info-block">
+          <h4>📏 Spon</h4>
+          <p>${info.spon}</p>
+        </div>
+      </div>
+      <div class="meziplodiny-section">
+        <h4>🌾 Meziplodiny a zelené hnojení</h4>
+        <div class="mezip-row">
+          <span class="mezip-label">Před</span>
+          <div class="mezip-plants">${info.mezipred.map(x => `<span class="mezip-pill">${x}</span>`).join('')}</div>
+        </div>
+        <div class="mezip-row">
+          <span class="mezip-label">Souběžně</span>
+          <div class="mezip-plants">${info.mezibehem.map(x => `<span class="mezip-pill">${x}</span>`).join('')}</div>
+        </div>
+        <div class="mezip-row">
+          <span class="mezip-label">Po sklizni</span>
+          <div class="mezip-plants">${info.mezipo.map(x => `<span class="mezip-pill">${x}</span>`).join('')}</div>
+        </div>
+      </div>
+      <div class="tip-box">💡 <strong>Tip zahradníka:</strong> ${info.tip}</div>
+    `;
+    infoCard.className = 'info-card visible';
+  } else {
+    infoCard.className = 'info-card';
+  }
+}
+</script>
+</body>
+</html>
