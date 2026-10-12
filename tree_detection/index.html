@@ -32,12 +32,12 @@ small { color:#888; font-size:10px; }
 <body>
 <div class="sidebar">
   <h2 style="margin:0;font-size:16px;color:#00f5ff;text-align:center;">AgroForest Detector v10</h2>
-
+  
   <div class="group"><h3>📁 1. Dlaždice ortofotomapy</h3><input type="file" id="file-input" accept="image/*"></div>
 
   <div class="group"><h3>🔍 2. Zvětšení</h3>
     <div class="row"><label>Zoom: <span id="view-zoom-val">300</span>%</label>
-    <input type="range" id="view-zoom" min="100" max="800" step="50" value="300"></div></div>
+    <input type="range" id="view-zoom" min="100" max="800" step="50" value="250"></div></div>
 
   <div class="group"><h3>🎯 3. Učení z kruhů</h3>
     <select id="draw-mode">
@@ -45,7 +45,7 @@ small { color:#888; font-size:10px; }
       <option value="neg">⛔ Negativní kruh (není strom – cesta, pole, stín…)</option>
     </select>
     <div class="row" style="margin-top:4px;"><input type="text" id="circle-label" placeholder="druh pozitivních kruhů, např. dub zimní"></div>
-    <div class="row"><label><input type="checkbox" id="auto-bg" checked> Vše mimo pozitivní kruhy je pozadí<br><small>zaškrtni, když jsi zakroužkoval VŠECHNY stromy na dlaždici; jinak kresli negativní kruhy a odškrtni</small></label></div>
+    <div class="row"><label><input type="checkbox" id="auto-bg" > Vše mimo pozitivní kruhy je pozadí<br><small>zaškrtni, když jsi zakroužkoval VŠECHNY stromy na dlaždici; jinak kresli negativní kruhy a odškrtni</small></label></div>
     <button id="learn-btn" class="primary">⚡ UČIT SE Z KRUHŮ</button>
     <div class="row" style="margin-top:4px;"><button id="undo-btn" class="secondary">↩ Zpět</button><button id="det2pos-btn" class="secondary">Detekce → pozitivní</button></div>
     <div class="row"><button id="clear-pos" class="secondary">Smazat pozitivní</button><button id="clear-neg" class="secondary">Smazat negativní</button></div>
@@ -56,7 +56,7 @@ small { color:#888; font-size:10px; }
 
   <div class="group"><h3>🌿 4. Detekce</h3>
     <div class="row"><label>Citlivost – práh skóre: <span id="thr-val">50</span>%</label><input type="range" id="thr" min="10" max="90" value="50"></div>
-    <div class="row"><label>Min. poloměr koruny: <span id="minr-val">3</span> px</label><input type="range" id="minr" min="2" max="30" value="3"></div>
+    <div class="row"><label>Min. poloměr koruny: <span id="minr-val">3</span> px</label><input type="range" id="minr" min="2" max="30" value="5"></div>
     <div class="row"><label>Max. poloměr jedné koruny: <span id="maxr-val">30</span> px<br><small>větší objekt = „skupina"</small></label><input type="range" id="maxr" min="5" max="120" value="30"></div>
     <div class="row"><label><input type="checkbox" id="heatmap"> Heatmapa skóre</label></div>
     <small>Heatmapa: průhledná = nízké skóre (pozadí), modrá → zelená → žlutá → červená = rostoucí pravděpodobnost stromu.</small>
@@ -82,11 +82,14 @@ small { color:#888; font-size:10px; }
     <button id="export-btn" class="success" style="margin-top:6px;padding:8px;">📥 EXPORT CSV</button></div>
 
   <div class="group"><h3>💾 Konfigurace (kruhy + naučený model)</h3>
-    <textarea id="config" placeholder="Po učení se zde objeví konfigurace…"></textarea>
+    <textarea id="config" placeholder="Po učení se zde objeví konfigurace…">{"v":10,"posCircles":[{"x":113.9466796875,"y":157.74666748046874,"r":11.59264851667113,"label":""},{"x":60.2800048828125,"y":156.5199951171875,"r":11.06128612887132,"label":""},{"x":9.6800048828125,"y":215.7066650390625,"r":17.725751557342726,"label":""},{"x":22.8666748046875,"y":68.5066650390625,"r":9.551089114705478,"label":""},{"x":9.986669921875,"y":48.879998779296876,"r":12.94191063898448,"label":""},{"x":55.37333984375,"y":20.666665649414064,"r":19.933337402345856,"label":""},{"x":95.5466796875,"y":16.373330688476564,"r":10.417635835651646,"label":""},{"x":248.8800048828125,"y":89.97332763671875,"r":12.255160985889102,"label":""},{"x":94.933349609375,"y":149.15999755859374,"r":6.519822612032216,"label":""},{"x":12.7466796875,"y":191.17333984375,"r":7.385506610878642,"label":""},{"x":25.6266845703125,"y":194.5466552734375,"r":5.528502927404526,"label":""}],"negCircles":[{"x":202.5733642578125,"y":195.77333984375,"r":41.63667475219113},{"x":171.9066650390625,"y":150.386669921875,"r":9.200004882817687},{"x":26.8533447265625,"y":116.34666748046875,"r":13.782940120606739},{"x":195.8266845703125,"y":15.45333251953125,"r":21.4228064647772},{"x":120.0800048828125,"y":12.693331909179687,"r":10.212513140889696},{"x":131.733349609375,"y":198.22666015625,"r":14.751900586711825},{"x":239.0666748046875,"y":238.4,"r":16.008453299438848},{"x":65.186669921875,"y":136.586669921875,"r":11.657360443831802},{"x":145.2266845703125,"y":146.7066650390625,"r":11.8454256766865},{"x":150.7466796875,"y":222.760009765625,"r":14.206293599023631},{"x":3.5466796875,"y":104.386669921875,"r":10.6806368233085}],"model":{"mean":[0.6679592917675545,0.412355009180774,0.27266198186665364,0.14648039020688888,-0.19156308708510633,0.3754398173496993,0.4785894550716834,0.03272279455981204,0.6596954583691748,0.35326940075609353,0.6457158619150086],"std":[0.2743632426286896,0.10084576788076588,0.0653184833437919,0.09769952476793396,0.10577454116329846,0.21250388454961963,0.2295433689798363,0.2778966069026934,0.2324213475781582,0.06460463020933817,0.3114338240554468],"w1":[-0.7322111294663203,-0.3402163647030797,0.39790378396938564,-0.15184500231702128,0.6772002562065621,0.07816944543430587,0.40961548236136125,0.03728352548949358,-1.2201246444068936,0.29555781799025643,0.45954682747785597,-0.1452103749114319,-0.385343259961362,-0.0967702643441194,-0.26358472176762177,0.14268701709285328,0.32678123756277394,0.37054492174929415,-0.1946696880439945,1.1615270209461834,-1.5874128315082443,0.3605106955098259,0.38831254245858954,0.7695336150829917,0.8066652084325616,-0.08903585070007135,0.3771614068682028,0.2941568525693906,0.34968258181146533,-0.40075493580935945,0.8959794890215902,-0.07831203275586388,0.42999061642913217,0.4072487883245381,-0.5778851572804369,-0.6451506636773447,0.5667942926033765,0.28110391646472294,-0.18848130039163435,0.831144053456969,0.26135449171712716,0.7178878529099071,0.43219101309083957,-0.7666587528206622,-0.2618602212354486,-0.22692209145220996,-0.29618692425140486,0.1264666538146986,0.26083328784365933,-0.167885604753537,-0.31270069517180116,0.19042538164667716,-1.2105404464805758,1.4840510705008647,-0.7032597542928963,0.8239950099836786,0.24017456683123217,-0.42112412460218984,0.03284505247861014,-1.0701134222393132,-0.05799392704383031,-0.8617301962003548,-0.3581598831163293,-0.09209668631718418,0.5457744231746534,-0.35967785200587316],"b1":[-2.3637894485097313,-0.928453827708267,-1.6961575383694478,-1.3370004139075915,0.9887990556880241,-0.44194496967130953],"w2":[-1.749701151219915,1.8846950649641665,1.6525692949744535,2.7012078149501533,-1.594037413311217,-1.8792751385781934],"b2":1.296123691521013},"protos":[]}
+</textarea>
     <button id="import-btn" class="secondary" style="margin-top:5px;">Načíst vloženou konfiguraci</button></div>
 </div>
 
 <div class="map-viewport"><div id="map-container"><canvas id="view"></canvas></div></div>
+
+<img id="demo" src="demo.jpeg" style=" position: absolute; visibility: hidden; " >
 
 <script>
 "use strict";
@@ -581,5 +584,18 @@ detIds.concat(viewIds).forEach(id => {
     });
 });
 $('heatmap').addEventListener('change', render);
+
+img = document.getElementById('demo');
+    img.onload = () => {
+        const sc = Math.min(1, 1200/img.width, 1200/img.height);
+        canvas.width = buf.width = heatCv.width = Math.round(img.width*sc);
+        canvas.height = buf.height = heatCv.height = Math.round(img.height*sc);
+        bctx.drawImage(img, 0, 0, buf.width, buf.height);
+        posCircles = []; negCircles = []; history = [];
+        applyZoom();
+        recomputeFeatures(); recomputeScore(); recomputeDetect(); render();}
+
+document.getElementById('import-btn').click();
+        
 </script>
 </body></html>
