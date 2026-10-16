@@ -1,0 +1,849 @@
+
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Standardizovaný index srážkových evapotranspirací SPEI-6</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background: #f5f5f5; color: #333; }
+        .container { max-width: 800px; background: white; margin: 0px auto; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .controls { margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+        label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+        input, select, button { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #2e7d32; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #1b5e20; }
+        canvas { border: 1px solid #ddd; background: #fff; width: 100%; height: 400px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Standardizovaný index srážkových evapotranspirací SPEI-6</h2>
+    
+    <div class="controls">
+		
+		<div>
+    <label>Vybrat lokalitu v ČR</label>
+    <select id="lokalita"  onchange="aplikujPrednastavenouLokalitu()">
+            <option value="CUSTOM">-- Vlastní souřadnice (zadejte vedle) --</option>
+
+        <optgroup label="Globální obilnice a zemědělská centra (Klíčová produkce)">
+            <option value="47.50,49.50,31.00,37.00">Ukrajinská celina (Světová obilnice - Černozem, mírné klima)</option>
+            <option data-name="Kukuřičný pás USA (Corn Belt - Iowa/Illinois, intenzivní produkce)" value="39.00,42.00,-100.00,-90.00">Kukuřičný pás USA (Corn Belt - Iowa/Illinois, intenzivní produkce)</option>
+            <option data-name="Argentinská Pampa (Obrovské pastviny a pěstování sóji/pšenice)" value="-36.00,-32.00,-63.00,-57.00">Argentinská Pampa (Obrovské pastviny a pěstování sóji/pšenice)</option>
+            <option data-name="Velká čínská nížina (Intenzivní pěstování rýže a pšenice)" value="33.00,36.00,113.00,118.00">Velká čínská nížina (Intenzivní pěstování rýže a pšenice)</option>
+            <option data-name="Indoganžská nížina (Indie - Klíčová zóna závislá na monzunech)" value="20.00,25.00,75.00,85.00">Indoganžská nížina (Indie - Klíčová zóna závislá na monzunech)</option>
+            <option data-name="Povodí Murray-Darling (Austrálie - Hlavní agro-zóna sužovaná suchy)" value="-35.00,-31.00,138.00,146.00">Povodí Murray-Darling (Austrálie - Hlavní agro-zóna sužovaná suchy)</option>
+        </optgroup>
+
+        <optgroup label="Agrolesnické pionýrské projekty a inspirace">
+            <option data-name="Zelená zeď v Sahelu (Niger/Nigérie - Obnova pouště agrolesnictvím)" value="13.50,14.50,2.00,6.00">Zelená zeď v Sahelu (Niger/Nigérie - Obnova pouště agrolesnictvím)</option>
+            <option data-name="Syntropické zemědělství Brazílie (São Paulo - Ernst Götsch systém)" value="-23.20,-22.80,-48.50,-47.50">Syntropické zemědělství Brazílie (São Paulo - Ernst Götsch systém)</option>
+            <option data-name="Portugalské Montado / Dehesa (Alentejo - Tradiční agrolesnický chov korkových dubů)" value="37.80,38.30,-8.20,-7.50">Portugalské Montado / Dehesa (Alentejo - Tradiční agrolesnický chov korkových dubů)</option>
+        </optgroup>
+
+        <optgroup label="Klimatické extrémy pro testování simulátoru">
+            <option data-name="Poušť Sahara (Libye - Absolutní sucho, nulová paměť vody)" value="22.00,26.00,15.00,25.00">Poušť Sahara (Libye - Absolutní sucho, nulová paměť vody)</option>
+            <option data-name="Amazonský prales (Brazílie - Extrémní srážky, permanentní vlhko)" value="-3.00,1.00,-65.00,-55.00">Amazonský prales (Brazílie - Extrémní srážky, permanentní vlhko)</option>
+            <option data-name="Delta Nilu (Egypt - Oáza uprostřed pouště závislá na toku řeky)" value="31.00,32.00,30.00,32.00">Delta Nilu (Egypt - Oáza uprostřed pouště závislá na toku řeky)</option>
+        </optgroup>
+            
+        <optgroup label="Česká republika">
+			<optgroup label="NEJSUŠŠÍ OBLASTI (Srážkové stíny a teplé nížiny)">
+        <option value="50.27,13.43" data-name="Žatecko (Nejsušší oblast ČR - srážkový stín)">Žatecko (Srážkový stín)</option>
+        <option value="48.81,16.63" data-name="Pálava / Mikulov (Extrémně teplá a suchá jižní Morava)">Jižní Morava (Pálava)</option>
+        <option value="50.08,14.43" data-name="Praha / Střední Čechy (Urbanizovaná suchá oblast)">Praha a okolí</option>
+        <option value="50.03,15.78" data-name="Pardubicko (Suchá Polabská nížina)">Polabí (Pardubice)</option>
+         </optgroup>
+			<optgroup label="STŘEDNĚ VLHKÉ / PŘECHODOVÉ OBLASTI">
+        <option value="50.62,15.09" data-name="Sychrov u Turnova (Český ráj / Podkrkonoší)">Sychrov u Turnova</option>
+        <option value="49.40,15.59" data-name="Jihlava (Vysočina - chladnější, proměnlivá oblast)">Vysočina (Jihlava)</option>
+          </optgroup>
+			<optgroup label=" NEJVLHČÍ OBLASTI (Hory a retence)">
+        <option value="50.83,15.27" data-name="Jizerské hory / Bílý Potok (Jedna z nejvlhčích oblastí ČR)">Jizerské hory</option>
+        <option value="50.73,15.74" data-name="Krkonoše / Pec pod Sněžkou (Vysokohorská vlhká zóna)">Krkonoše</option>
+        <option value="49.16,18.23" data-name="Beskydy (Vlhké karpatské pohoří)">Beskydy</option>
+        <option value="49.03,13.42" data-name="Šumava / Modrava (Vysoká retence a srážky)">Šumava</option>
+          </optgroup>
+			<optgroup label="VLTAVSKÁ KASKÁDA A JEJÍ PŘÍTOKY (Oblastní ořezy povodí)">
+<option value="CELA_KASKADA" data-name="Celé povodí Vltavy (Sjednocení Horní Vltavy, Otavy, Berounky a Sázavy)" data-type="kompozit">Celé povodí Vltavy (Sjednocení Horní Vltavy, Otavy, Berounky a Sázavy)</option>
+  </optgroup>
+        </optgroup>
+    </select>
+</div>
+
+    <div style="grid-column: span 2;">
+        <label>Zeměpisné souřadnice (GPS)</label>
+        <input type="text" id="gps_vstup" value="50.08, 14.43" onchange="resetLokalitaSelect()" placeholder="Např. 50.62,15.09 nebo 49.35,49.95,14.40,15.80">
+        <span style="font-size: 11px; color: #666;">Formát: <b>Lat, Lon</b> (bod) nebo <b>LatMin, LatMax, LonMin, LonMax</b> (obdélník)</span>
+    </div>
+    
+        <div>
+            <label>Od roku</label>
+            <select id="rok_od"></select>
+        </div>
+        <div>
+            <label>Do roku</label>
+            <select id="rok_do"></select>
+        </div>
+        
+        <div>
+    <label>Rozdělit trend na (let)</label>
+    <select id="trend_segment" onchange="nactiData()">
+        <option value="0">Celé období (v kuse)</option>
+        <option value="1">Po 1. letech</option>
+        <option value="3">Po 3. letech</option>
+        <option value="5">Po 5. letech</option>
+        <option value="10">Po 10. letech</option>
+        <option value="15">Po 15. letech</option>
+        <option value="20">Po 20. letech</option>
+    </select>
+</div>
+<div>
+    <label>Zahrnout do trendu</label>
+    <select id="trend_mesic" onchange="nactiData()">
+        <option value="-1">Všechny měsíce (celoroční)</option>
+        <option value="0">Jen Leden</option>
+        <option value="1">Jen Únor</option>
+        <option value="2">Jen Březen</option>
+        <option value="3">Jen Duben (jarní růst)</option>
+        <option value="4">Jen Květen</option>
+        <option value="5">Jen Červen</option>
+        <option value="6">Jen Červenec (letní vrchol)</option>
+        <option value="7">Jen Srpen</option>
+        <option value="8">Jen Září</option>
+        <option value="9">Jen Říjen</option>
+        <option value="10">Jen Listopad</option>
+        <option value="11">Jen Prosinec</option>
+    </select>
+</div>
+<div>
+    <label style="display: inline-flex; align-items: center; cursor: pointer; margin-top: 25px;">
+        <input type="checkbox" id="zobrazit_segmenty" onchange="nactiData()" style="width: auto; margin-right: 8px;">
+        Zobrazit segmentovaný trend
+    </label>
+<!-- checked
+-->
+</div>
+<div>
+    <label style="display: inline-flex; align-items: center; cursor: pointer; margin-top: 25px;">
+        <input type="checkbox" id="rezim_percentil" onchange="nactiData()" style="width: auto; margin-right: 8px;" checked>
+        Zobrazit jako historický percentil
+    </label>
+</div>
+        <div>
+            <label>&nbsp;</label>
+            <button onclick="nactiData()">Načíst a simulovat</button>
+        </div>
+    </div>
+
+    <div id="nacitam" style=" height: 100%; width: 100%; display: none;"> <br> Načítám graf, prosím počkejte... <br> </div>
+    <canvas id="graf" width="1600" height="800"></canvas>
+</div>
+
+<script>
+	
+	    // Inicializace ročních selektorů (1991 až 2026 na základě 428 měsíců)
+    const START_ROK = 1991;
+    const CELKEM_MESICU = 428;
+    const KONEC_ROK = START_ROK + Math.floor(CELKEM_MESICU / 12);
+
+    const selectOd = document.getElementById("rok_od");
+    const selectDo = document.getElementById("rok_do");
+
+    for(let r = START_ROK; r <= KONEC_ROK; r++) {
+        selectOd.options[selectOd.options.length] = new Option(r, r);
+        selectDo.options[selectDo.options.length] = new Option(r, r);
+    }
+    selectDo.value = KONEC_ROK;
+    
+    
+function resetLokalitaSelect() {
+    const lokalitaSelect = document.getElementById("lokalita");
+    lokalitaSelect.value = "CUSTOM";
+	lokalitaSelect.selectedOptions[0].dataset.name = "Zeměpisné souřadnice: " + document.getElementById("gps_vstup").value;
+}
+
+function aplikujPrednastavenouLokalitu() {
+    const lokalitaSelect = document.getElementById("lokalita");
+    const val = lokalitaSelect.value;
+    
+    if (val === "CUSTOM") return;
+    
+    if (val === "CELA_KASKADA") {
+        document.getElementById("gps_vstup").value = "CELA_KASKADA";
+    } else {
+        const casti = val.split(",");
+        if (casti.length === 4 && casti[0] === casti[1] && casti[2] === casti[3]) {
+            // Pokud jsou v optionu min/max stejné (bod), zjednodušíme výpis pro uživatele na 2 čísla
+            document.getElementById("gps_vstup").value = `${casti[0]}, ${casti[2]}`;
+        } else {
+            // Jinak vypíšeme celý obdélník oddělený čárkami
+            document.getElementById("gps_vstup").value = casti.join(", ");
+        }
+    }
+    
+    nactiData();
+}
+    
+
+
+async function nactiData() {
+    const gpsVstup = document.getElementById("gps_vstup").value.trim();
+    const rokOd = parseInt(document.getElementById("rok_od").value);
+    const rokDo = parseInt(document.getElementById("rok_do").value);
+
+    try {
+		
+    const canvas = document.getElementById("graf");
+    canvas.style.display = "none";
+    const nacitani = document.getElementById("nacitam");
+    nacitani.style.display = "block";
+		
+        let finalniSloučenáData = Array(CELKEM_MESICU).fill(0);
+
+        // Definice 4 hlavních povodí s jejich přesnými zeměpisnými rozsahy a dlouhodobými hydrologickými váhami
+        const definiceKaskady = [
+            { latMin: 48.50, latMax: 48.90, lonMin: 13.70, lonMax: 14.40, vaha: 0.22 }, // Horní Vltava
+            { latMin: 48.95, latMax: 49.40, lonMin: 13.40, lonMax: 14.20, vaha: 0.18 }, // Otava
+            { latMin: 49.50, latMax: 50.05, lonMin: 12.80, lonMax: 14.00, vaha: 0.36 }, // Berounka
+            { latMin: 49.35, latMax: 49.95, lonMin: 14.40, lonMax: 15.80, vaha: 0.24 }  // Sázava
+        ];
+
+        // --- REŽIM 1: CELÉ POVODÍ VLTAVY (VÁŽENÝ KOMPOZIT) ---
+        if (gpsVstup === "CELA_KASKADA") {
+            const docasnaVazenaData = Array(CELKEM_MESICU).fill(0);
+            const sumaVahVMesici = Array(CELKEM_MESICU).fill(0);
+
+            for (const povodi of definiceKaskady) {
+                const dataPovodi = Array(CELKEM_MESICU).fill(0);
+                const countPixelu = Array(CELKEM_MESICU).fill(0);
+
+                // Iterace přes mřížku pixelů v rámci daného sub-povodí
+                for (let currentLat = povodi.latMin; currentLat <= povodi.latMax; currentLat += 0.25) {
+                    for (let currentLon = povodi.lonMin; currentLon <= povodi.lonMax; currentLon += 0.25) {
+                        try {
+                            const poleDatPixelu = await stahniAAkceptujPixel(currentLat, currentLon);
+                            for (let m = 0; m < CELKEM_MESICU; m++) {
+                                if (poleDatPixelu[m] !== null) {
+                                    dataPovodi[m] += poleDatPixelu[m];
+                                    countPixelu[m]++;
+                                }
+                            }
+                        } catch (e) { continue; } // Přeskočí případné chybové/neplatné body
+                    }
+                }
+
+                // Přepočet na čistý průměr povodí a započtení hydrologické váhy řeky
+                for (let m = 0; m < CELKEM_MESICU; m++) {
+                    if (countPixelu[m] > 0) {
+                        const cistyPrumerPovodi = dataPovodi[m] / countPixelu[m];
+                        docasnaVazenaData[m] += (cistyPrumerPovodi * povodi.vaha);
+                        sumaVahVMesici[m] += povodi.vaha;
+                    }
+                }
+            }
+
+            // Finální sloučení všech 4 subsystémů
+            for (let m = 0; m < CELKEM_MESICU; m++) {
+                if (sumaVahVMesici[m] > 0) {
+                    finalniSloučenáData[m] = docasnaVazenaData[m] / sumaVahVMesici[m];
+                } else {
+                    finalniSloučenáData[m] = null;
+                }
+            }
+
+        } else {
+            // --- REŽIM 2 A 3: VLASTNÍ VSTUP UŽIVATELE (BOD NEBO OBDÉLNÍK Z TEXTBOXU) ---
+            const souradnice = gpsVstup.split(",").map(num => parseFloat(num.trim()));
+            
+            if (souradnice.some(isNaN)) {
+                throw new Error("Neplatný formát souřadnic. Zadejte čísla oddělená čárkou.");
+            }
+
+            let latMin, latMax, lonMin, lonMax;
+
+            if (souradnice.length === 2) {
+                // BOD -> převedeme na obdélník s nulovou velikostí
+                latMin = latMax = souradnice[0];
+                lonMin = lonMax = souradnice[1];
+            } else if (souradnice.length === 4) {
+                // OBDÉLNÍK
+                latMin = souradnice[0];
+                latMax = souradnice[1];
+                lonMin = souradnice[2];
+                lonMax = souradnice[3];
+            } else {
+                throw new Error("Zadejte buď 2 souřadnice (bod: Lat, Lon) nebo 4 souřadnice (obdélník: LatMin, LatMax, LonMin, LonMax).");
+            }
+
+            let poctyPixeluVMesici = Array(CELKEM_MESICU).fill(0);
+            let docasnaSumaData = Array(CELKEM_MESICU).fill(0);
+
+            // Výpočet průměru z libovolné uživatelské plochy či jednoho bodu
+            for (let currentLat = Math.min(latMin, latMax); currentLat <= Math.max(latMin, latMax); currentLat += 0.25) {
+                for (let currentLon = Math.min(lonMin, lonMax); currentLon <= Math.max(lonMin, lonMax); currentLon += 0.25) {
+                    try {
+                        const poleDatPixelu = await stahniAAkceptujPixel(currentLat, currentLon);
+                        for (let m = 0; m < CELKEM_MESICU; m++) {
+                            if (poleDatPixelu[m] !== null) {
+                                docasnaSumaData[m] += poleDatPixelu[m];
+                                poctyPixeluVMesici[m]++;
+                            }
+                        }
+                    } catch (e) { continue; }
+                }
+            }
+
+            for (let m = 0; m < CELKEM_MESICU; m++) {
+                if (poctyPixeluVMesici[m] > 0) {
+                    finalniSloučenáData[m] = docasnaSumaData[m] / poctyPixeluVMesici[m];
+                } else {
+                    finalniSloučenáData[m] = null;
+                }
+            }
+        }
+
+        // Časové oříznutí pole na základě vybraných let na ose X
+        const startMesic = (rokOd - START_ROK) * 12;
+        const konecMesic = ((rokDo - START_ROK) + 1) * 12;
+        const filtrovanaData = finalniSloučenáData.slice(startMesic, konecMesic);
+
+        // Vykreslení finálního grafu na Canvas
+        vykresliGraf(filtrovanaData, rokOd, rokDo);
+    nacitani.style.display = "none";
+    canvas.style.display = "block";
+
+    } catch (error) {
+        alert("Chyba: " + error.message);
+    }
+
+}
+
+// Pomocná funkce izolující stahování a dekompresi jednoho bodu
+async function stahniAAkceptujPixel(lat, lon) {
+    const response = await fetch(`get_data.php?lat=${lat}&lon=${lon}`);
+    if (!response.ok) throw new Error("Chyba stahování");
+    
+    const compressedBuffer = await response.arrayBuffer();
+    const stream = new Response(compressedBuffer).body.pipeThrough(new DecompressionStream("gzip"));
+    const decompressedBuffer = await new Response(stream).arrayBuffer();
+    const packedBytes = new Uint8Array(decompressedBuffer);
+
+    const data4bit = [];
+    for(let i = 0; i < packedBytes.length; i++) {
+        data4bit.push(packedBytes[i] >> 4);
+        data4bit.push(packedBytes[i] & 0x0F);
+    }
+
+    const X = Math.round((lon - (-179.875)) / 0.25);
+    const Y = Math.round(((89.875) - lat) / 0.25);
+    const local_x = X % 45;
+    const local_y = Y % 45;
+    
+    const pixelHistory = [];
+    const pixel_offset = (local_y * 45 + local_x) * CELKEM_MESICU;
+    
+    for(let m = 0; m < CELKEM_MESICU; m++) {
+        const kod = data4bit[pixel_offset + m];
+        const spei = (kod === 15) ? null : (kod / (14.0 / 8.0)) - 4.0;
+        pixelHistory.push(spei);
+    }
+    return pixelHistory;
+}
+
+
+	
+	
+  function vykresliGraf(data, rokOd, rokDo) {
+    const canvas = document.getElementById("graf");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const paddingLeft = 50;
+    const paddingRight = 20;
+    const paddingTop = 60;
+    const paddingBottom = 60;
+    
+    const graphWidth = canvas.width - paddingLeft - paddingRight;
+    const graphHeight = canvas.height - paddingTop - paddingBottom;
+
+    // 1. DEFINICE BAREVNÝCH PÁSEM INDEXU (Podle agronomického dopadu)
+    const pasma = [
+        { max: 4.0,  min: 2.0,  barvaPozadi: "rgba(13, 71, 161, 0.15)",  barvaCary: "#0d47a1", tloustka: 3, text: "Extrémní vlhko" },
+        { max: 2.0,  min: 1.0,  barvaPozadi: "rgba(30, 136, 229, 0.1)",  barvaCary: "#1e88e5", tloustka: 1.5, text: "Mírné vlhko" },
+        { max: 1.0,  min: -1.0, barvaPozadi: "rgba(255, 255, 255, 0)",    barvaCary: "#888888", tloustka: 1, text: "Normál" },
+        { max: -1.0, min: -2.0, barvaPozadi: "rgba(255, 152, 0, 0.1)",   barvaCary: "#ff9800", tloustka: 2, text: "Mírné sucho" },
+        { max: -2.0, min: -4.0, barvaPozadi: "rgba(211, 47, 47, 0.15)",   barvaCary: "#d32f2f", tloustka: 4, text: "Kritické sucho" }
+    ];
+
+    // Pomocné matematické funkce pro transformaci souřadnic do Canvasu
+    const getX = (i) => paddingLeft + (i / (data.length - 1)) * graphWidth;
+    const getY = (val) => {
+        if (val === null) return paddingTop + graphHeight / 2;
+        return paddingTop + graphHeight - ((val + 4) / 8) * graphHeight;
+    };
+
+    // 2. VYKRESLENÍ HORIZONTÁLNÍCH PÁSEM A OSY Y
+    pasma.forEach(pasm => {
+        const yTop = getY(pasm.max);
+        const yBot = getY(pasm.min);
+        
+        // Vybarvení pozadí zóny tonální barvou
+        ctx.fillStyle = pasm.barvaPozadi;
+        ctx.fillRect(paddingLeft, yTop, graphWidth, yBot - yTop);
+
+        // Hraniční čára
+        ctx.strokeStyle = pasm.barvaCary;
+        ctx.lineWidth = pasm.tloustka;
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, yBot);
+        ctx.lineTo(paddingLeft + graphWidth, yBot);
+        ctx.stroke();
+
+        // Popisky na ose Y (Indexové hodnoty a texty pásem)
+        ctx.fillStyle = pasm.barvaCary;
+        ctx.font = "bold 16px sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(pasm.min.toFixed(1), paddingLeft - 15, yBot + 5);
+        
+        ctx.font = "italic 14px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(pasm.text, paddingLeft + 15, yTop + (yBot - yTop) / 2 + 5);
+    });
+
+    // 3. DYNAMICKÁ OSA X (Měsíce a Roky)
+    const mesiceNazvy = ["Led", "Úno", "Bře", "Dub", "Kvě", "Čer", "Čec", "Srp", "Září", "Říj", "Lis", "Pro"];
+    const sirkaNaMesic = graphWidth / data.length;
+
+    // Rozhodovací logika zobrazení podle dostupné šířky v pixelech
+    let typZobrazeni = "nazev"; // výchozí
+    if (sirkaNaMesic < 45)  typZobrazeni = "cislo";
+    if (sirkaNaMesic < 15)  typZobrazeni = "index";
+    if (sirkaNaMesic < 6)   typZobrazeni = "carka";
+    if (sirkaNaMesic < 1.5) typZobrazeni = "vypustit";
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+
+    for (let i = 0; i < data.length; i++) {
+        const aktualniCelkovyMesic = (rokOd - START_ROK) * 12 + i;
+        const rok = START_ROK + Math.floor(aktualniCelkovyMesic / 12);
+        const mesicIndex = aktualniCelkovyMesic % 12;
+        const xPos = getX(i);
+
+        // A. Vertikální mřížka pro ROKY (Silnější čára v lednu)
+        if (mesicIndex === 0) {
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.25)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(xPos, paddingTop);
+            ctx.lineTo(xPos, paddingTop + graphHeight);
+            ctx.stroke();
+
+            // Zápis roku pod osu
+            ctx.fillStyle = "#000";
+            ctx.font = "bold 16px sans-serif";
+            ctx.fillText(rok, xPos, paddingTop + graphHeight + 25);
+        } 
+        // B. Vertikální mřížka pro MĚSÍCE (Jemná šedá čárka)
+        else if (typZobrazeni !== "vypustit") {
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.15)";
+            ctx.lineWidth = 0.9;
+            ctx.beginPath();
+            ctx.moveTo(xPos, paddingTop);
+            ctx.lineTo(xPos, paddingTop + graphHeight);
+            ctx.stroke();
+        }
+
+        // C. Vykreslení textových popisků měsíců na základě hustoty mřížky
+        ctx.fillStyle = "#666";
+        ctx.font = "12px sans-serif";
+
+        if (typZobrazeni === "nazev") {
+            ctx.fillText(mesiceNazvy[mesicIndex], xPos, paddingTop + graphHeight + 5);
+        } else if (typZobrazeni === "cislo") {
+            ctx.fillText(mesicIndex + 1, xPos, paddingTop + graphHeight + 5);
+        } else if (typZobrazeni === "index") {
+            if (i % 6 === 0) ctx.fillText(i, xPos, paddingTop + graphHeight + 5); // Každý půlrok index měření
+        } else if (typZobrazeni === "carka") {
+            if (mesicIndex === 6) { // Značka uprostřed roku (v červenci)
+                ctx.beginPath();
+                ctx.moveTo(xPos, paddingTop + graphHeight);
+                ctx.lineTo(xPos, paddingTop + graphHeight + 6);
+                ctx.stroke();
+            }
+        }
+    }
+
+    // 4. HISTORICKÁ DATA SUCHA (Hlavní spojnicová čára)
+    ctx.beginPath();
+    ctx.strokeStyle = "#0288d1";
+    ctx.lineWidth = 3;
+    let prvniBod = true;
+    for (let i = 0; i < data.length; i++) {
+        if (data[i] === null) continue;
+        if (prvniBod) {
+            ctx.moveTo(getX(i), getY(data[i]));
+            prvniBod = false;
+        } else {
+            ctx.lineTo(getX(i), getY(data[i]));
+        }
+    }
+    ctx.stroke();
+
+    const zobrazitSegmenty = document.getElementById("zobrazit_segmenty").checked;
+    // 5. ROZMĚLNĚNÝ / SEGMENTOVANÝ KLIMATICKÝ TREND
+    const segmentLet = parseInt(document.getElementById("trend_segment").value);
+    const segmentMesicu = segmentLet * 12;
+
+    if (zobrazitSegmenty) {
+        const segmentLet = parseInt(document.getElementById("trend_segment").value);
+        const zvolenyMesic = parseInt(document.getElementById("trend_mesic").value);
+
+        // Krok A: Extrahujeme pouze indexy a hodnoty, které odpovídají filtru měsíce
+        const filtrovaneBodyTrendu = [];
+        for (let i = 0; i < data.length; i++) {
+            if (data[i] === null) continue;
+            const celkovyMesic = (rokOd - START_ROK) * 12 + i;
+            const mIdx = celkovyMesic % 12;
+
+            if (zvolenyMesic === -1 || mIdx === zvolenyMesic) {
+                filtrovaneBodyTrendu.push({ xIdx: i, val: data[i] });
+            }
+        }
+
+        // Pomocná funkce pro výpočet lineárního trendu na specifickém úseku profiltrovaných bodů
+        function vykresliTrendovyUsek(odSubIdx, doSubIdx) {
+            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0, count = 0;
+            
+            for (let i = odSubIdx; i <= doSubIdx; i++) {
+                const bod = filtrovaneBodyTrendu[i];
+                sumX += bod.xIdx;
+                sumY += bod.val;
+                sumXY += bod.xIdx * bod.val;
+                sumXX += bod.xIdx * bod.xIdx;
+                count++;
+            }
+            if (count < 2) return null;
+
+            const k = (count * sumXY - sumX * sumY) / (count * sumXX - sumX * sumX);
+            const q = (sumY - k * sumX) / count;
+
+            const startBod = filtrovaneBodyTrendu[odSubIdx];
+            const konecBod = filtrovaneBodyTrendu[doSubIdx];
+
+            const yStart = k * startBod.xIdx + q;
+            const yKonec = k * konecBod.xIdx + q;
+
+            // Vykreslení přímky
+            ctx.strokeStyle = "#d32f2f";
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(getX(startBod.xIdx), getY(yStart));
+            ctx.lineTo(getX(konecBod.xIdx), getY(yKonec));
+            ctx.stroke();
+
+            // Uzlový bod přechodu
+            ctx.fillStyle = "#d32f2f";
+            ctx.beginPath();
+            ctx.arc(getX(konecBod.xIdx), getY(yKonec), 6, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Textový údaj hodnoty nad spojem
+            ctx.fillStyle = "#000";
+            ctx.font = "bold 13px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(yKonec.toFixed(2), getX(konecBod.xIdx), getY(yKonec) - 20);
+        }
+
+        // Krok B: Rozdělení dat na úseky
+        // Pokud filtrujeme 1 měsíc, délka kroku v poli je rovna počtu let (segmentLet).
+        // Pokud bereme všechny měsíce, krok v poli je (segmentLet * 12).
+        const krokVRade = (zvolenyMesic === -1) ? (segmentLet * 12) : segmentLet;
+
+        if (krokVRade === 0 || filtrovaneBodyTrendu.length <= krokVRade) {
+            vykresliTrendovyUsek(0, filtrovaneBodyTrendu.length - 1);
+        } else {
+            let start = 0;
+            while (start < filtrovaneBodyTrendu.length - 1) {
+                let konec = start + krokVRade;
+                if (konec >= filtrovaneBodyTrendu.length) konec = filtrovaneBodyTrendu.length - 1;
+                if (konec - start < 2) break; // Pojistka pro krátký konec osy
+                vykresliTrendovyUsek(start, konec);
+                start = konec;
+            }
+        }
+    }
+ 
+    
+const zvolenyMesic = parseInt(document.getElementById("trend_mesic").value);
+const bodyKrivky = [];
+
+// 1. EXTRAKCE DAT PRO FILTROVANÝ TREND
+for (let i = 0; i < data.length; i++) {
+    const aktualniCelkovyMesic = (rokOd - START_ROK) * 12 + i;
+    const mesicIndex = aktualniCelkovyMesic % 12;
+    const rok = START_ROK + Math.floor(aktualniCelkovyMesic / 12);
+
+    if (zvolenyMesic === -1 || mesicIndex === zvolenyMesic) {
+        if (data[i] !== null) {
+            bodyKrivky.push({ xIdx: i, val: data[i], rok: rok });
+        }
+    }
+}
+
+// 2. VÝPOČET PŘEKRÝVANÝCH FÁZÍ (KLOUZAVÝ PRŮMĚR, NAPŘ. OKNO PLES 5 BODŮ)
+//const okno = segmentLet; // délka fáze (počet let/měření)
+// Správná definice okna: Pokud filtrujeme měsíc, 1 bod = 1 rok. Pokud ne, 12 bodů = 1 rok.
+const okno = (zvolenyMesic === -1) ? (segmentLet * 12) : segmentLet;
+//const okno = segmentLet;
+
+const vyhlazeneBody = [];
+
+for (let i = 0; i < bodyKrivky.length; i++) {
+    let sumY = 0;
+    let count = 0;
+    
+    // Překryv: bereme hodnoty kolem aktuálního bodu (polovina vlevo, polovina vpravo)
+    const startIdx = Math.max(0, i - Math.floor(okno / 2));
+    const konecIdx = Math.min(bodyKrivky.length - 1, i + Math.floor(okno / 2));
+    
+    for (let j = startIdx; j <= konecIdx; j++) {
+        sumY += bodyKrivky[j].val;
+        count++;
+    }
+    
+    const prumernaHodnota = sumY / count;
+    vyhlazeneBody.push({
+        x: getX(bodyKrivky[i].xIdx),
+        y: getY(prumernaHodnota),
+        val: prumernaHodnota,
+        rok: bodyKrivky[i].rok
+    });
+}
+
+// 3. VYKRESLENÍ PYLNULÉ TRENDOVÉ KŘIVKY (Bezierovy křivky)
+if (vyhlazeneBody.length > 1) {
+    ctx.beginPath();
+    ctx.strokeStyle = "#e65100"; // Sytě oranžovo-červená pro klimatický trend
+    ctx.lineWidth = 3;
+    
+    ctx.moveTo(vyhlazeneBody[0].x, vyhlazeneBody[0].y);
+    
+    for (let i = 0; i < vyhlazeneBody.length - 1; i++) {
+        // Výpočet kontrolních bodů pro hladký přechod (křivku) mezi fázemi
+        const xc = (vyhlazeneBody[i].x + vyhlazeneBody[i + 1].x) / 2;
+        const yc = (vyhlazeneBody[i].y + vyhlazeneBody[i + 1].y) / 2;
+        ctx.quadraticCurveTo(vyhlazeneBody[i].x, vyhlazeneBody[i].y, xc, yc);
+    }
+    ctx.lineTo(vyhlazeneBody[vyhlazeneBody.length - 1].x, vyhlazeneBody[vyhlazeneBody.length - 1].y);
+    ctx.stroke();
+
+    // 4. ZOBRAZENÍ HODNOTY U KAŽDÉHO ROKU PODÉL KŘIVKY
+    vyhlazeneBody.forEach((bod, index) => {
+        // Aby nebyly texty přehuštěné, u celoročního módu zobrazíme jen každý 12. bod, u měsíčního filtru každý rok
+        if (zvolenyMesic !== -1 || index % 12 === 0) {
+            // Malý uzlový bod
+            ctx.fillStyle = "#e65100";
+            ctx.beginPath();
+            ctx.arc(bod.x, bod.y, 4, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Textový údaj indexu
+            ctx.fillStyle = "#000";
+            ctx.font = "11px sans-serif";
+            ctx.textAlign = "center";
+            // Zápis hodnoty mírně nad nebo pod bod podle toho, zda je v suchu či vlhku
+            const textYOffset = (bod.val < 0) ? 15 : -10;
+            ctx.fillText(bod.val.toFixed(2), bod.x, bod.y + textYOffset);
+        }
+    });
+}
+
+// --- 3. ČÁRA: DLOUHODOBÁ PAMĚŤ KRAJINY (Deficit vs. Percentil s podporou měsíčního filtru) ---
+const rezimPercentil = document.getElementById("rezim_percentil").checked;
+
+// Krok A: Filtrace historických dat – vybereme pouze ty body, které odpovídají filtru měsíce
+const filtrovaneBodyProDeficit = [];
+let sumaProPrumer = 0;
+let pocetProPrumer = 0;
+
+for (let i = 0; i < data.length; i++) {
+    if (data[i] === null) continue;
+    const celkovyMesic = (rokOd - START_ROK) * 12 + i;
+    const mIdx = celkovyMesic % 12;
+
+    // Pokud je vybrán celoroční režim (-1) nebo se měsíc shoduje s filtrem
+    if (zvolenyMesic === -1 || mIdx === zvolenyMesic) {
+        filtrovaneBodyProDeficit.push({ idx: i, val: data[i], mIdx: mIdx });
+        sumaProPrumer += data[i];
+        pocetProPrumer++;
+    }
+}
+
+// Spočítáme celkový průměr pro filtrované období (referenční rovina)
+const referencniPrumer = pocetProPrumer > 0 ? (sumaProPrumer / pocetProPrumer) : 0;
+
+// Krok B: Výpočet průběžné akumulace na základě vaší logiky přičítání/odečítání odchylek
+const suroveAkumulace = Array(data.length).fill(null);
+let prubeznaSuma = 0;
+let maxAbsolutniHodnota = 0.0001;
+
+filtrovaneBodyProDeficit.forEach(bod => {
+    // Čistý rozdíl oproti referenčnímu průměru vybraného měsíčního profilu
+    const rozdil = Math.abs(referencniPrumer - bod.val);
+
+    if (bod.val >= referencniPrumer) {
+        prubeznaSuma += rozdil; // Nadprůměrný stav vláhy -> přičteme k rezervoáru
+    } else {
+        prubeznaSuma -= rozdil; // Podprůměrný stav (sucho) -> odečteme z rezervoáru
+    }
+    
+    suroveAkumulace[bod.idx] = prubeznaSuma;
+    
+    if (Math.abs(prubeznaSuma) > maxAbsolutniHodnota) {
+        maxAbsolutniHodnota = Math.abs(prubeznaSuma);
+    }
+});
+
+// Krok C: MATEMATICKÉ ZPRACOVÁNÍ PODLE REŽIMU (Percentil vs. Škálovaný deficit)
+const finalniVykreslovaciRada = Array(data.length).fill(null);
+let textStavu = "";
+let posledniVykreslenyIdx = -1;
+
+if (rezimPercentil) {
+    // --- REŽIM 1: HISTORICKÝ PERCENTIL (0 až 100 %) ---
+    // Extrahujeme si pouze platné stavy akumulace pro výpočet procentilového pořadí
+    const jenPlatneAkumulace = filtrovaneBodyProDeficit.map(bod => suroveAkumulace[bod.idx]);
+
+    filtrovaneBodyProDeficit.forEach(bod => {
+        const aktualniStav = suroveAkumulace[bod.idx];
+        
+        let pocetNizsich = 0;
+        jenPlatneAkumulace.forEach(v => { if (v < aktualniStav) pocetNizsich++; });
+        
+        const percentil = (pocetNizsich / jenPlatneAkumulace.length) * 100;
+        
+        // Přepočet percentilu (0 až 100) na vizuální rozsah Y osy grafu (-3.8 až +3.8)
+        finalniVykreslovaciRada[bod.idx] = ((percentil / 100) * 7.6) - 3.8;
+        posledniVykreslenyIdx = bod.idx;
+    });
+    
+    if (posledniVykreslenyIdx !== -1) {
+        const poslPerc = ((finalniVykreslovaciRada[posledniVykreslenyIdx] + 3.8) / 7.6) * 100;
+        textStavu = `Stav: ${poslPerc.toFixed(0)}. percentil`;
+    }
+} else {
+    // --- REŽIM 2: PŮVODNÍ DYNAMICKY ŠKÁLOVANÝ DEFICIT ---
+    const pomerSkalovani = 3.8 / maxAbsolutniHodnota;
+    
+    filtrovaneBodyProDeficit.forEach(bod => {
+        finalniVykreslovaciRada[bod.idx] = suroveAkumulace[bod.idx] * pomerSkalovani;
+        posledniVykreslenyIdx = bod.idx;
+    });
+    
+    if (posledniVykreslenyIdx !== -1) {
+        textStavu = `Stav akumulace: ${suroveAkumulace[posledniVykreslenyIdx].toFixed(1)}`;
+    }
+}
+
+// Krok D: Vykreslení černé čáry na plátno (spojujeme body filtrované časové osy)
+ctx.beginPath();
+ctx.strokeStyle = "#000000";
+ctx.lineWidth = 3.5;
+let prvyBodCary = true;
+
+for (let i = 0; i < finalniVykreslovaciRada.length; i++) {
+    if (finalniVykreslovaciRada[i] === null) continue;
+    
+    if (prvyBodCary) {
+        ctx.moveTo(getX(i), getY(finalniVykreslovaciRada[i]));
+        prvyBodCary = false;
+    } else {
+        ctx.lineTo(getX(i), getY(finalniVykreslovaciRada[i]));
+    }
+}
+ctx.stroke();
+
+// Vykreslení koncového uzlového bodu s textovým údajem o stavu
+if (posledniVykreslenyIdx !== -1 && finalniVykreslovaciRada[posledniVykreslenyIdx] !== null) {
+    const xPos = getX(posledniVykreslenyIdx);
+    const yPos = getY(finalniVykreslovaciRada[posledniVykreslenyIdx]);
+
+    ctx.fillStyle = "#000000";
+    ctx.beginPath();
+    ctx.arc(xPos, yPos, 6, 0, 2 * Math.PI);
+    ctx.fill();
+
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillText(textStavu, xPos - 50, yPos - 15);
+}
+
+// Krok E: Dynamický popisek do horní legendy grafu podle aktivních filtrů
+ctx.fillStyle = "#000000";
+ctx.font = "bold 16px sans-serif";
+ctx.textAlign = "left";
+
+const profilMesiceText = (zvolenyMesic === -1) ? "celoroční" : `${zvolenyMesic + 1}. měsíce`;
+let textLegendy = "";
+
+if (rezimPercentil) {
+    textLegendy = `■ Paměť podzemních vod (Historický percentil pro ${profilMesiceText} akumulaci 0-100 %)`;
+} else {
+    const vizualniZmenaProcenta = ((3.8 / maxAbsolutniHodnota) * 100).toFixed(0);
+    textLegendy = `■ Kumulovaný deficit (Měřítko pro ${profilMesiceText} trend upraveno na ${vizualniZmenaProcenta} % vůči ose Y)`;
+}
+
+ctx.fillText(textLegendy, paddingLeft + 700, paddingTop - 20);
+
+
+    // 6. LEGENDA GRAFU
+    ctx.fillStyle = "#333";
+    ctx.font = "bold 22px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(`Klimatický vývoj: ${rokOd} - ${rokDo}`, paddingLeft, paddingTop - 50);
+    
+const lokalitaSelect = document.getElementById("lokalita");
+// selectedOptions[0] vybere aktuálně zvolenou položku <option>
+const val = lokalitaSelect.selectedOptions[0].dataset.name;
+    ctx.font = "bold 16px sans-serif";
+    ctx.fillText(`${val}`, paddingLeft, paddingTop - 20);
+    
+    
+
+// Popisek pro plynulou trendovou křivku
+ctx.fillStyle = "#e65100"; // Oranžovo-červená barva křivky
+ctx.font = "bold 16px sans-serif";
+ctx.textAlign = "left";
+
+const textMesice = (zvolenyMesic === -1) ? "celoroční" : `${zvolenyMesic + 1}. měsíce`;
+ctx.fillText(
+    `■ Agro-trend (klouzavý průměr za ${segmentLet} let pro ${textMesice} vývoj)`, 
+    paddingLeft + 510, 
+    paddingTop - 45
+);
+    
+    ctx.fillStyle = "#0288d1";
+    ctx.fillText("■ Půdní index (SPEI-6)", paddingLeft + 320, paddingTop - 45);https://localhost/ruzne/moje/sucho/2/databaze_setridene/index_sucha_srazek_SPEI_6_evapotranspirace/zobrazeni_dat.html
+    
+    if (zobrazitSegmenty) {
+    ctx.fillStyle = "#d32f2f";
+    ctx.fillText("■ Segmentovaný agro-trend (s hodnotou spojů)", paddingLeft + 980, paddingTop - 45);
+}
+}
+
+// Spustit jednou při načtení stránky, aby se nastavily výchozí hodnoty první lokality
+window.onload = function() {
+    document.getElementById("lokalita").value = "48.81,16.63";
+    document.getElementById("trend_segment").value = "1";
+	//resetLokalitaSelect();
+    aplikujPrednastavenouLokalitu();
+    nactiData();
+};
+
+
+</script>
+
+</body>
+</html>
