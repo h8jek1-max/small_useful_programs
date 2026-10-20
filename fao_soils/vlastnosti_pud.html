@@ -14,7 +14,7 @@
     table.pudni-tabulka { width: 100%; border-collapse: collapse; margin-top: 0px; font-size: 12px; }
     table.pudni-tabulka th, table.pudni-tabulka td { border: 1px solid #ddd; padding: 3px; text-align: center; }
     table.pudni-tabulka th { background: #e4f0d6; color: #335e23; }
-    .dominantni-info { font-weight: bold; color: #2e7d32; margin-bottom: 5px; }
+    .dominantni-info { font-weight: bold; color: #3d3d3d; margin-bottom: 5px; }
      .controls { margin-bottom: 5px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
         label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
         input, select, button { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
@@ -85,12 +85,12 @@
 
      <div id="pudni-komponenty-kontainer" style="margin: 0px 0px 10px 0px;"></div>
      
-    <div class="controls">     
-    <div class="dominantni-info" id="puda-meta">Klikněte do mapy nebo vyberte lokalitu výše...</div>
+    <div class="controls">   
     <!-- Geografické informace o místě -->
-<div id="geo-info-panel" class="dominantni-info" style="background: #e3f2fd; border-color: #2196f3; display:none; margin-bottom:15px;">
+<div id="geo-info-panel" class="dominantni-info" style="grid-column: span 3;background: #e3f2fd; border-color: #2196f3; display:none; margin-bottom:15px;">
     📍 <b>Lokalita:</b> <span id="geo-obec">-</span>, <span id="geo-okres">-</span>, <span id="geo-stat">-</span>
-</div>
+</div>  
+    <div class="dominantni-info" id="puda-meta" style="grid-column: span 3;"> Klikněte do mapy nebo vyberte lokalitu výše...</div>
 </div>
 
 </div>
@@ -222,7 +222,7 @@ async function nactiGeografickeUdaje(lat, lon) {
 async function nactiPudniProfil(lat, lon) {
     const metaPanel = document.getElementById("puda-meta");
     const kontainer = document.getElementById("pudni-komponenty-kontainer");
-    kontainer.innerHTML = '<h4 style="text-align: center;margin: 0px 0px 10px 0px;">Procentuelní zastoupení vlastností půd v souboru souřadnic zadané souřadnice pro 1 km</h4>';
+    kontainer.innerHTML = '<h4 style="text-align: center;margin: 0px 0px 10px 0px;">Procentuelní zastoupení vlastností půd v souboru souřadnic zadané souřadnice pro 30 obloukových vteřin (Na rovníku 930×930m.)</h4>';
     
     nactiGeografickeUdaje(lat, lon);
     
@@ -255,7 +255,42 @@ async function nactiPudniProfil(lat, lon) {
             return;
         }
 
-        metaPanel.innerHTML = `Půdní uzel HWSD2 ID: <b>${dataPudy.smu_id}</b>. Obsahuje <b>${dataPudy.komponenty.length}</b> půdní složky.`;
+        metaPanel.innerHTML = `<h3 style="margin:0px 10px 10px 10px;text-align: center;">🧪 Jak určit vlastnosti půdy</h3>
+
+<p>Pokud je v souboru souřadnic více půdních složek, můžete upřesnit výběr z nich pro danou lokalitu těmito testy:</p>
+
+<ol>
+
+  <li>Kruhový test textury (Určení podílu Písku / Jílu / Prachu)</li>
+
+</ol>
+
+<p>Vezměte do ruky hrst hlíny z hloubky cca 10 cm, mírně ji navlhčete vodou a promíchejte v dlani, dokud nemá konzistenci modelíny. Zkuste z ní vyválet váleček a ohnout ho do kroužku:
+• Půda se drolí a nelze z ní nic vytvarovat: Je to Písčitá půda (v tabulce vysoké % písku). Voda v ní rychle proteče.
+• Váleček vytvarujete, ale při ohnutí do kroužku praská: Je to Hlinitá/Prachová půda (ideální střed, v tabulce vysoké % prachu).
+• Vytvarujete dokonalý, hladký a lesklý kroužek, který drží tvar: Je to Těžká jílovitá půda (v tabulce vysoké % jílu). Zde hrozí povodně.</p>
+
+<ol>
+
+  <li>Octový a mýdlový test (Určení pH)</li>
+
+</ol>
+
+<p>Místo lakmusových papírků můžete vzít vzorek hlíny do skleničky a zalít ho běžným kuchyňským octem:
+• Směs začne silně šumět a bublat: Půda obsahuje hodně vápence. Je zásaditá (v tabulce pH > 7.2).
+• Směs vůbec nereaguje: Půda je buď neutrální, nebo kyselá. Vezměte nový vzorek hlíny, smíchejte ho s vodou na blátíčko a nasypte do něj jedlou sodu (nebo mýdlovou vodu). Pokud začne šumět, půda je silně kyselá.</p>
+
+<ol>
+
+  <li>Test vsakování s rourou</li>
+
+</ol>
+
+<p>Vezměte kousek plastové nebo kovové trubky (ideálně o průměru 10–15 cm), zatlučte ji 5 cm do země, aby voda neutíkala do stran. Nalijte do ní vodu do výšky přesně 25 mm a stopujte na hodinkách, za jak dlouho se voda zcela vsákne:
+• Pokud se vsákne pod 10 minut, infiltrace je skvělá. Pokud tam voda stojí i po hodině, půda je utužená (Objemová hmotnost > 1.45) nebo s velkým podílem jílu.</p>
+
+<p>Pokud hospodaříte v ČR, porovnejte tyto záložky s kódem BPEJ na adrese: <a href="https://bpej.vumop.cz/">bpej.vumop.cz</a>
+</p>`;
 
         const tabMenu = document.createElement("div");
         tabMenu.style.display = "flex"; tabMenu.style.gap = "4px"; tabMenu.style.margin = "0px 6px 5px 6px";
@@ -335,7 +370,7 @@ if (vrstvyKys.length > 0) {
                     <th title="HUMUS (ORGANICKÝ UHLÍK): Klíč k úrodnosti a absorpci vody. Rozsah: 0-10 %. Běžná ornice v ČR má jen 1-1.5 %. Hodnoty nad 2.2 % značí bohatou regenerativní půdu, nad 4 % excelentní stav zadržující vodu jako houba.">Humus</th>
                     <th title="KYSELOST (pH vody): Ovlivňuje dostupnost živin pro biopásy a dřeviny. Rozsah: 1-14. Pod 5.5 (silně kyselá) - ideální pro duby, borovice či borůvky, nevhodná pro pšenici. 6.0-7.2 je optimální neutrální střed.">pH</th>
                     <th title="CELKOVÝ DUSÍK (TOTAL N): Celková zásoba dusíku v půdě. Rozsah: 0-10 g/kg. Pod 1.0 g/kg značí chudou půdu vyžadující jetelotravní biopásy nebo pionýrské dřeviny fixující dusík (olše, rakytník).">Celkový N</th>
-                    <th title="POMĚR CILÍKU A DUSÍKU (C/N RATIO): Rychlost rozkladu organické hmoty. Rozsah: 5-50. Optimální rychlý rozklad: 10-12. Hodnoty kolem 15-20 značí stabilní, dřevnatější biomasu (mulč), která skvěle buduje trvalý úrodný profil.">Poměr C/N</th>
+                    <th title="POMĚR UHLÍKU A DUSÍKU (C/N RATIO): Rychlost rozkladu organické hmoty. Rozsah: 5-50. Optimální rychlý rozklad: 10-12. Hodnoty kolem 15-20 značí stabilní, dřevnatější biomasu (mulč), která skvěle buduje trvalý úrodný profil.">Poměr C/N</th>
                     <th title="KATIONTOVÁ VÝMĚNNÁ KAPACITA JÍLU (CEC CLAY): Chemická aktivita jílu a schopnost vázat humus (vazba na živcové podloží). Rozsah: 0-100 cmolc/kg. Nad 24 = špičkový aktivní jíl (smektit) pevně fixující humus. Pod 12 = degradovaný jíl (kaolinit).">Aktivita jílu</th>
                     <th title="ELEKTRICKÁ VODIVOST (SALINITA): Množství rozpuštěných solí v půdě. Rozsah: 0-20 dS/m. Bezpečná hodnota pro jemné kořeny sazenic v biopásech je pod 2.0 dS/m. Vyšší hodnoty pálí kořeny a blokují příjem vody.">Salinita</th>
                 </tr>
