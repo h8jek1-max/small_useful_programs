@@ -11,11 +11,11 @@ if (!isset($_GET['lat']) || !isset($_GET['lon'])) {
 $lat = (float)$_GET['lat'];
 $lon = (float)$_GET['lon'];
 
-if ($lat > 60.0 || $lat < -60.0) {
-    http_response_code(404);
-    echo json_encode(["error" => "Mimo rozsah"]);
-    exit;
-}
+//if ($lat > 60.0 || $lat < -60.0) {
+    //http_response_code(404);
+    //echo json_encode(["error" => "Mimo rozsah"]);
+    //exit;
+//}
 
 $ncols = 43200; $nrows = 21600;
 $xdim = 0.00833333333333333; $ydim = 0.00833333333333333;
