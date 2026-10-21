@@ -13,10 +13,10 @@ if (!isset($_GET['lat']) || !isset($_GET['lon'])) {
 $lat = (float)$_GET['lat'];
 $lon = (float)$_GET['lon'];
 
-if ($lat > 60.0 || $lat < -60.0) {
-    http_response_code(404);
-    die("Oblast mimo obyvatelnou zónu");
-}
+//if ($lat > 60.0 || $lat < -60.0) {
+    //http_response_code(404);
+    //die("Oblast mimo obyvatelnou zónu");
+//}
 
 $X = (int)round(($lon - (-179.875)) / 0.25);
 $Y = (int)round(((89.875) - $lat) / 0.25);
