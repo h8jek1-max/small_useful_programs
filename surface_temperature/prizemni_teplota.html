@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Projekce teploty vzduchu (TAS)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="leaflet.min.css">
+    <script src="leaflet.min.js"></script>
+
+<style>
+    body { margin: 0; padding: 0; font-family: sans-serif; display: flex; height: 100vh; }
+    #mapa-kontainer {  flex-grow: 1; height: 100%; margin: 0px;}
+    .vegetacni-panel {
+        position: relative; /* Nutné pro správné umístění táhla */
+        height: 100%; 
+        display: flex; 
+        flex-direction: column; 
+        gap: 0px; 
+        width: 500px;       /* Výchozí šířka panelu při načtení */
+        min-width: 20%;   /* Minimální šířka */
+        max-width: 90%;   /* maximální šířka */
+        margin: 0px; 
+        background: #fff; 
+        padding: 0px 5px 0px 15px;
+        overflow-y: auto;  
+    }
+    .resizer {
+        width: 8px;
+        height: 100%;
+        position: absolute;
+        background: #ddd;
+        top: 0px;
+        left: 0px;
+        cursor: col-resize; /* Změní kurzor na šipky vlevo/vpravo */
+        user-select: none;  /* Zabrání označování textu při tažení */
+    }
+    .resizer:hover { background: #d8d8d8; }
+    table.pudni-tabulka { width: 100%; border-collapse: collapse; margin-top: 0px; font-size: 12px; }
+    table.pudni-tabulka th, table.pudni-tabulka td { border: 1px solid #ddd; padding: 3px; text-align: center; }
+    table.pudni-tabulka th { background: #e4f0d6; color: #335e23; }
+    .dominantni-info { color: #3d3d3d; margin-bottom: 15px; font-size: 14px; }
+    .controls { margin-bottom: 5px; padding: 5px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+    label { display: block; font-size: 11px; font-weight: bold; margin-bottom: 4px; color: #444; }
+    input, select, button { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    button { background: #2e7d32; color: white; border: none; cursor: pointer; font-weight: bold; padding: 8px; margin-top: 15px; }
+    button:hover { background: #1b5e20; }
+</style>
+
+</head>
+<body>
+
+<div id="mapa-kontainer"></div>
+
+<div class="vegetacni-panel">
+	
+    <h4 style="margin:10px;text-align: center;">Budoucí projekce přízemní teploty vzduchu (TAS)</h4>
+    <h4 style="margin:0px 10px 10px 10px;text-align: center;">Celý program i s databází si můžete stáhnout na Githubu: <a href="https://github.com/h8jek1-max/small_useful_programs" >https://github.com/h8jek1-max/small_useful_programs</a></h4>
+	
+<div class="controls">
+        
+    <div style="grid-column: span 1;">
+        <label style="display: inline-flex; align-items: center; cursor: pointer; margin-bottom: 4px;">
+            <input type="checkbox" id="zobrazit" onchange="prekresliGslMapu()" style="width: auto; margin-right: 4px;" >
+            Zobrazit mapu předpovědi
+        </label>
+    </div>
+    
+    <div style="grid-column: span 2;">
+        <label>Zeměpisné souřadnice (GPS)</label>
+        <input type="text" id="gps_vstup" value="50.08, 14.43" onchange="vynutObnoveniGrafu()" placeholder="Formát:  50.62,15.09">
+    </div>
+    
+    <div>
+        <label>Od roku</label>
+        <select id="rok_od" onchange="vynutObnoveniGrafu()"></select>
+
+        <label>Do roku</label>
+        <select id="rok_do" onchange="vynutObnoveniGrafu()"></select>
+    </div>
+    
+    <div style="grid-column: span 1;">
+        <label style="display: inline-flex; align-items: center; cursor: pointer; margin-bottom: 4px;">
+            Po měsících
+        </label>
+        <!-- DOPLNĚNÍ: Integrace výběru měsíců pro časovou osu 1020 kroků teplotního modelu checked-->
+        <select id="trend_mesic" onchange="prekresliGslMapu(); vynutObnoveniGrafu();">
+            <option value="ALL" selected>Celoroční průměr</option>
+            <option value="0">Leden</option>
+            <option value="1">Únor</option>
+            <option value="2">Březen</option>
+            <option value="3">Duben</option>
+            <option value="4">Květen</option>
+            <option value="5">Červen</option>
+            <option value="6">Červenec</option>
+            <option value="7">Srpen</option>
+            <option value="8">Září</option>
+            <option value="9">Říjen</option>
+            <option value="10">Listopad</option>
+            <option value="11">Prosinec</option>
+        </select>
+    </div>
+    
+    <div>
+        <label>Trend (let)</label>
+        <select id="trend_segment" onchange="prekresliGslMapu();vynutObnoveniGrafu()">
+            <option value="NONE" selected>Nevypočítávat trend v mapě i v grafu</option>
+            <option value="0">Celé období</option>
+            <option value="3">Po 3 letech</option>
+            <option value="5">Po 5 letech</option>
+            <option value="10">Po 10 letech</option>
+            <option value="15">Po 15 letech</option>
+            <option value="20">Po 20 letech</option>
+        </select>
+        <label style="display: inline-flex; align-items: center; cursor: pointer; margin-top: 12px;">
+            <input type="checkbox" id="rezim_percentil" onchange="vynutObnoveniGrafu()" style="width: auto; margin-right: 4px;"> Percentil
+        </label>
+    </div>
+    
+    <div style="grid-column: span 3;" id="gsl_casovy_panel">
+        <label>Zvolený rok projekce pro zobrazení v mapě: <span id="gsl_rok_label" style="font-weight:bold; color:#e65100;">2015</span></label>
+        <input type="range" id="gsl_rok_slider" min="2015" max="2099" value="2015" step="1" oninput="posunulSeRokProjekce()">
+    </div>
+
+    <!-- Dynamická legenda mapy -->
+    <div id="mapa-legenda" class="pudni-panel" style="display:none; font-size:12px; grid-column: span 3; flex-direction: row;">
+        <b id="legenda-titulek">Legenda:</b>
+        <div id="legenda-barvy" style="display:flex; gap:3px; max-width: 410px; margin: 4px auto 0px auto;"></div>
+    </div>
+
+</div>
+
+<div class="" id="gsl-graf-sekce" style="margin-top: 5px;">
+    <canvas id="gslGraf" width="1600" height="600" style="cursor: pointer; border: 1px solid #ddd; background: #fff; width: 100%; height: auto; border-radius: 6px; display:none;" onclick="
+    if (this.style.position === 'fixed') {
+        this.style.position = ''; this.style.left = ''; this.style.top = ''; this.style.transform = 'translate(0%, 0%)'; this.style.zIndex = ''; this.style.boxShadow = '';
+    } else {
+        this.style.position = 'fixed'; this.style.left = '50%'; this.style.top = '50%'; this.style.transform = 'translate(-50%, -50%)'; this.style.zIndex = '1000'; this.style.boxShadow = '0px 0px 100px';
+    }
+"></canvas>
+    <div class="dominantni-info" id="gsl-meta-info" >
+        Kliknutím do mapy zobrazíte graf budoucího vývoje na daných souřadnicích.
+    </div>
+</div>
+
+    <div class="resizer"></div>
+    
+</div>
+
+
+<script>
+	
+const panel = document.querySelector('.vegetacni-panel');
+const resizer = document.querySelector('.resizer');
+resizer.addEventListener('mousedown', initResize, false);
+
+function initResize(e) {
+    e.preventDefault();
+    window.addEventListener('mousemove', StartResize, false);
+    window.addEventListener('mouseup', StopResize, false);
+}
+
+function StartResize(e) {
+    // Spočítá novou šířku na základě pravého okraje panelu
+    const panelRight = panel.getBoundingClientRect().right;
+    const newWidth = panelRight - e.clientX;
+    panel.style.width = newWidth + 'px';
+}
+
+function StopResize() {
+    window.removeEventListener('mousemove', StartResize, false);
+    window.removeEventListener('mouseup', StopResize, false);
+}
+
+
+
+// Inicializace ročních selektorů při startu podle časové osy TAS (2015-2099)
+const START_ROK_TAS = 2015;
+const CELKEM_MESICU_TAS = 1020;
+
+const selOd = document.getElementById("rok_od");
+const selDo = document.getElementById("rok_do");
+if (selOd && selDo && selOd.options.length === 0) {
+    for (let r = START_ROK_TAS; r <= 2099; r++) {
+        selOd.options[selOd.options.length] = new Option(r, r);
+        selDo.options[selDo.options.length] = new Option(r, r);
+    }
+    selDo.value = 2099;
+}
+
+// =============================================================================
+// GLOBÁLNÍ KONSTANTY A EFEKTIVNÍ SPRÁVA PAMĚTI (TAS CACHE)
+// =============================================================================
+
+class TasMapovaCache {
+    constructor(maxVelikost = 150) {
+        this.maxVelikost = maxVelikost;
+        this.cache = new Map();
+    }
+    ziskej(klic) {
+        if (!this.cache.has(klic)) return null;
+        const data = this.cache.get(klic);
+        this.cache.delete(klic);
+        this.cache.set(klic, data);
+        return data;
+    }
+    uloz(klic, data) {
+        if (this.cache.has(klic)) this.cache.delete(klic);
+        else if (this.cache.size >= this.maxVelikost) {
+            // Smazání nejstaršího nepoužívaného okna pro ochranu RAM
+            const nejstarsiKlic = this.cache.keys().next().value;
+            this.cache.delete(nejstarsiKlic);
+        }
+        this.cache.set(klic, data);
+    }
+    vymazVse() { this.cache.clear(); }
+}
+
+const gslKlientskaPamet = new TasMapovaCache(150);
+let gslTileLayerLeaflet = null;
+let aktualniMarker = null;
+
+// =============================================================================
+// INICIALIZACE MAPY LEAFLET A MĚŘÍTKA podle vaší šablony
+// =============================================================================
+const map = L.map('mapa-kontainer').setView([50.62, 15.09], 9);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 22, attribution: '© OpenStreetMap'
+}).addTo(map);
+
+L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
+
+map.on('click', function(e) {
+    const lat = e.latlng.lat.toFixed(4);
+    const lon = e.latlng.lng.toFixed(4);
+    const gpsVstup = document.getElementById("gps_vstup");
+    if (gpsVstup) gpsVstup.value = `${lat}, ${lon}`;
+    
+    // Spuštění nového teplotního grafu
+    nactiGslHistoriiProGraf(lat, lon);
+});
+
+function posunulSeRokProjekce() {
+    const aktivniRok = document.getElementById("gsl_rok_slider").value;
+    document.getElementById("gsl_rok_label").innerText = aktivniRok;
+    if (gslTileLayerLeaflet) gslTileLayerLeaflet.redraw();
+}
+
+// Pomocná funkce pro vyvolání překreslení grafu při změně ovládacích prvků
+function vynutObnoveniGrafu() {
+    const gpsVstup = document.getElementById("gps_vstup").value;
+    if (gpsVstup) {
+
+            const castiGps = gpsVstup.split(',').map(num => parseFloat(num.trim()));
+            if(castiGps.length === 2 && !isNaN(castiGps[0])) {
+                lat = castiGps[0].toFixed(4);
+                lon = castiGps[1].toFixed(4);
+            nactiGslHistoriiProGraf(lat, lon);
+        }
+    }
+}
+
+// =============================================================================
+// 3. ULTRA-PRECIZNÍ RASTROVÁNÍ MATICE TEPLOTY (Sub-pixelový Canvas se stíny a volbou trendů)
+// =============================================================================
+function prekresliGslMapu() {
+    const vlastnost = document.getElementById("trend_mesic").value;
+    const casovyPanel = document.getElementById("gsl_casovy_panel");
+    const legPanel = document.getElementById("mapa-legenda");
+    const legBarvy = document.getElementById("legenda-barvy");
+    const zobraz = document.getElementById("zobrazit").checked;
+
+    if (gslTileLayerLeaflet) { map.removeLayer(gslTileLayerLeaflet); gslTileLayerLeaflet = null; }
+    if (legBarvy) legBarvy.innerHTML = "";
+
+    if (!zobraz) {
+        if (casovyPanel) casovyPanel.style.display = "none";
+        if (legPanel) legPanel.style.display = "none";
+        return;
+    }
+    
+    if (casovyPanel) casovyPanel.style.display = "block";
+    if (legPanel) legPanel.style.display = "block";
+
+    // Teplotní stupnice od mrazů (tmavě modrá) přes optimální tóny (zelená/žlutá) po horka (tmavě červená)
+    const legendySkaly = [
+        { min: -60, max: 0,   barva: "rgb(13, 71, 161)",  t: "Mrazivé periody <br>(< 0 °C)" },
+        { min: 0,   max: 12,  barva: "rgb(46, 125, 50)",   t: "Chladné / Jarní <br>(0 - 12 °C)" },
+        { min: 12,  max: 20,  barva: "rgb(255, 235, 59)",  t: "Mírné optimální <br>(12 - 20 °C)" },
+        { min: 20,  max: 28,  barva: "rgb(255, 152, 0)",  t: "Teplé / Letní <br>(20 - 28 °C)" },
+        { min: 28,  max: 60,  barva: "rgb(211, 47, 47)",  t: "Tropické vlny <br>(> 28 °C)" }
+    ];
+    legendySkaly.forEach(l => {
+        legBarvy.innerHTML += `<div style="text-align: center; margin-right:15px; margin-top:5px; display:inline-block;"><div style="width:20px; height:15px; background:${l.barva}; margin:5px auto; border:1px solid #aaa;"></div><span>${l.t}</span></div>`;
+    });
+
+    document.getElementById("legenda-titulek").innerText = "Legenda: Projekce přízemní teploty vzduchu (TAS v °C)";
+
+    // Načítáme průhlednost z vašeho opraveného id prvku puda_vrstva_opacity z 1. dílu HTML
+    gslTileLayerLeaflet = L.gridLayer({ tileSize: 256, opacity: 0.65 });
+    gslTileLayerLeaflet.createTile = function(coords) {
+        const tile = L.DomUtil.create('canvas', 'leaflet-tile');
+        const ctx = tile.getContext('2d');
+        tile.width = tile.height = this.options.tileSize;
+
+        const klicDlazdice = `${coords.x}_${coords.y}_${coords.z}`;
+        const aktivniRok = parseInt(document.getElementById("gsl_rok_slider").value);
+        const indexRoku = aktivniRok - START_ROK_TAS;
+        const trendSegmentVolba = document.getElementById("trend_segment").value;
+        const krok = 16; 
+
+        setTimeout(async () => {
+            let dataDlazdice = gslKlientskaPamet.ziskej(klicDlazdice);
+
+            if (!dataDlazdice) {
+                const poleLat = [], poleLon = [];
+                for (let y = 0; y < 256; y += krok) {
+                    for (let x = 0; x < 256; x += krok) {
+                        const gPoint = map.unproject([coords.x * 256 + x, coords.y * 256 + y], coords.z);
+                        poleLat.push(gPoint.lat.toFixed(4)); poleLon.push(gPoint.lng.toFixed(4));
+                    }
+                }
+                try {
+                    const res = await fetch(`get_temp.php?lats=${poleLat.join(',')}&lons=${poleLon.join(',')}`);
+                    if (!res.ok) return;
+                    dataDlazdice = await res.json();
+                    gslKlientskaPamet.uloz(klicDlazdice, dataDlazdice);
+                } catch (e) { return; }
+            }
+
+            for (let y = 0; y < 256; y += krok) {
+                for (let x = 0; x < 256; x += krok) {
+                    const gPoint = map.unproject([coords.x * 256 + x, coords.y * 256 + y], coords.z);
+                    const klicBodu = `${gPoint.lat.toFixed(4)}_${gPoint.lng.toFixed(4)}`;
+                    
+                    if (dataDlazdice && dataDlazdice[klicBodu] && !dataDlazdice[klicBodu].error) {
+                        const historieTeplot = dataDlazdice[klicBodu].data;
+                        const startMěsícRoku = indexRoku * 12;
+                        let vyhlazenaTeplota = null;
+
+                        // Výpočet rozsahu vyhlazování (okenního průměru let) podle volby z optionu trend_segment
+                        let k_let = 0;
+                        if (trendSegmentVolba !== "NONE" && trendSegmentVolba !== "0") {
+                            k_let = Math.floor(parseInt(trendSegmentVolba) / 2);
+                        } else if (trendSegmentVolba === "0") {
+                            k_let = Math.floor((2099 - START_ROK_TAS) / 2); // Celé období
+                        }
+
+                        if (vlastnost === "ALL") {
+                            // Celoroční průměr – kumulace celých roků podle vybraného rozsahu trendu
+                            let sumaRoku = 0, countRoku = 0;
+                            const rStart = Math.max(0, indexRoku - k_let);
+                            const rKonec = Math.min(Math.floor(historieTeplot.length / 12) - 1, indexRoku + k_let);
+                            
+                            for (let rIdx = rStart; rIdx <= rKonec; rIdx++) {
+                                for (let m = 0; m < 12; m++) {
+                                    const v = historieTeplot[rIdx * 12 + m];
+                                    if (v !== null) { sumaRoku += v; countRoku++; }
+                                }
+                            }
+                            vyhlazenaTeplota = countRoku > 0 ? (sumaRoku / countRoku) : null;
+                        } else {
+                            // Specifický izolovaný měsíc – vyhlazujeme krokem po celých letech (+12 indexů)
+                            const cistyIndexMesice = startMěsícRoku + parseInt(vlastnost);
+                            
+                            if (trendSegmentVolba !== "NONE") {
+                                let sumOkna = 0, countOkna = 0;
+                                const sOkna = Math.max(parseInt(vlastnost), cistyIndexMesice - (k_let * 12));
+                                const kOkna = Math.min(historieTeplot.length - 1, cistyIndexMesice + (k_let * 12));
+                                
+                                for (let j = sOkna; j <= kOkna; j += 12) {
+                                    if (historieTeplot[j] !== null && historieTeplot[j] !== undefined) { 
+                                        sumOkna += historieTeplot[j]; countOkna++; 
+                                    }
+                                }
+                                vyhlazenaTeplota = countOkna > 0 ? (sumOkna / countOkna) : historieTeplot[cistyIndexMesice];
+                            } else {
+                                // Surová data bez jakéhokoliv trendu
+                                vyhlazenaTeplota = historieTeplot[cistyIndexMesice];
+                            }
+                        }
+
+                        if (vyhlazenaTeplota !== null && vyhlazenaTeplota !== undefined) {
+                            const match = legendySkaly.find(l => vyhlazenaTeplota >= l.min && vyhlazenaTeplota < l.max);
+                            if (match) {
+                                const barva = match.barva; const stinRadius = 18;
+                                const centerX = x + krok / 2; const centerY = y + krok / 2;
+                                const gradient = ctx.createRadialGradient(centerX, centerY, krok / 2, centerX, centerY, stinRadius);
+                                gradient.addColorStop(0, barva);
+                                const transparentniBarva = barva.replace("rgb", "rgba").replace(")", ", 0)");
+                                gradient.addColorStop(1, transparentniBarva);
+
+                                ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = gradient;
+                                ctx.fillRect(x - stinRadius, y - stinRadius, krok + stinRadius * 2, krok + stinRadius * 2);
+                            } else { ctx.globalCompositeOperation = 'source-over'; }
+                        }
+                    }
+                }
+            }
+        }, 0);
+        return tile;
+    };
+    gslTileLayerLeaflet.addTo(map);
+}
+
+map.on('zoomend', function() {
+    if (document.getElementById("trend_mesic").value !== "NONE") prekresliGslMapu();
+});
+
+// =============================================================================
+// 4. INTERAKTIVNÍ GRAF S ADAPTIVNÍ OSOU X PODLE SPEI-6 (Téma: Teplota TAS)
+// =============================================================================
+async function nactiGslHistoriiProGraf(lat, lon) {
+    const metaGsl = document.getElementById("gsl-meta-info");
+    const canvasGsl = document.getElementById("gslGraf");
+    const vlastnost = document.getElementById("trend_mesic").value;
+    const rokOd = parseInt(document.getElementById("rok_od").value) || START_ROK_TAS;
+    const rokDo = parseInt(document.getElementById("rok_do").value) || 2099;
+    const trendSegmentVolba = document.getElementById("trend_segment").value;
+    const rezimPercentil = document.getElementById("rezim_percentil").checked;
+    const zobrazitTrendy = (trendSegmentVolba !== "NONE");
+    
+    metaGsl.innerHTML = "<i>Buduji komplexní 85letý teplotní profil pro agrolesnické simulace (TAS)...</i>";
+    if(canvasGsl) canvasGsl.style.display = "none";
+
+    if (aktualniMarker) map.removeLayer(aktualniMarker);
+    aktualniMarker = L.marker([lat, lon]).addTo(map);
+
+    try {
+        const res = await fetch(`get_temp.php?lats=${lat}&lons=${lon}`);
+        if (!res.ok) throw new Error("Chyba přenosu");
+        const balikDat = await res.json();
+
+        const klicBodu = `${parseFloat(lat).toFixed(4)}_${parseFloat(lon).toFixed(4)}`;
+        if (!balikDat || !balikDat[klicBodu] || balikDat[klicBodu].error) {
+            throw new Error(balikDat[klicBodu]?.error || "Oblast mimo pevninskou síť.");
+        }
+
+        const surovaDataTas = balikDat[klicBodu].data;
+
+        // --- FILTRACE A OŘEZ DAT PODLE ROKŮ A MĚSÍCŮ ---
+        const tasHistorie = [];
+        const popiskyRokuGrafu = [];
+        const indexyMesicuGrafu = [];
+
+        for (let i = 0; i < surovaDataTas.length; i++) {
+            const indexRoku = Math.floor(i / 12);
+            const rok = START_ROK_TAS + indexRoku;
+            const mIdx = i % 12;
+
+            if (rok < rokOd || rok > rokDo) continue;
+
+            if (vlastnost === "ALL") {
+                if (mIdx === 0) {
+                    let sumRoku = 0, countRoku = 0;
+                    for(let m = 0; m < 12; m++) {
+                        if (surovaDataTas[i + m] !== null) { sumRoku += surovaDataTas[i + m]; countRoku++; }
+                    }
+                    tasHistorie.push(countRoku > 0 ? sumRoku / countRoku : null);
+                    popiskyRokuGrafu.push(rok);
+                    indexyMesicuGrafu.push(0);
+                }
+            } else {
+                if (mIdx === parseInt(vlastnost)) {
+                    tasHistorie.push(surovaDataTas[i]);
+                    popiskyRokuGrafu.push(rok);
+                    indexyMesicuGrafu.push(mIdx);
+                }
+            }
+        }
+
+        if(canvasGsl) canvasGsl.style.display = "block";
+        const ctx = canvasGsl.getContext("2d");
+        ctx.clearRect(0, 0, canvasGsl.width, canvasGsl.height);
+        
+        const padLeft = 100, padRight = 60, padTop = 60, padBottom = 80;
+        const gWidth = canvasGsl.width - padLeft - padRight;
+        const gHeight = canvasGsl.height - padTop - padBottom;
+        
+        // Výpočet dynamické osy Y podle extrémů stupňů Celsia
+        let minVal = 60, maxVal = -60;
+        tasHistorie.forEach(v => { if (v !== null) { if (v < minVal) minVal = v; if (v > maxVal) maxVal = v; } });
+        minVal = Math.floor(minVal - 2); maxVal = Math.ceil(maxVal + 2);
+        const rozsahY = maxVal - minVal;
+        const krokOsyY = rozsahY / 10;
+        
+        const getGslX = (i) => padLeft + (i / (tasHistorie.length - 1)) * gWidth;
+        const getGslY = (val) => padTop + gHeight - ((val - minVal) / rozsahY) * gHeight;
+        
+        // Horizontální mřížka a orientační rysky osy Y (KOREKCE: Zaokrouhleno na 1 desetinné místo)
+        ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.font = "14px sans-serif";
+        for (let i = 0; i <= 10; i++) {
+            const aktY = minVal + (i * krokOsyY);
+            ctx.strokeStyle = "rgba(0,0,0,0.35)";
+            ctx.beginPath(); ctx.moveTo(padLeft, getGslY(aktY)); ctx.lineTo(padLeft + gWidth, getGslY(aktY)); ctx.stroke();
+            ctx.fillStyle = "#555"; ctx.fillText(`${aktY.toFixed(1)} °C`, padLeft - 15, getGslY(aktY));
+        }
+        
+        // =============================================================================
+        // ADAPTIVNÍ OSA X S VERTIKÁLNÍMI LINKAMI PODLE HUSTOTY SPEI-6
+        // =============================================================================
+        const mesiceNazvy = ["Led", "Úno", "Bře", "Dub", "Kvě", "Čer", "Čec", "Srp", "Září", "Říj", "Lis", "Pro"];
+        const sirkaNaMesic = gWidth / tasHistorie.length;
+
+        let typZobrazeni = "nazev"; 
+        if (sirkaNaMesic < 45)  typZobrazeni = "cislo";
+        if (sirkaNaMesic < 15)  typZobrazeni = "index";
+        if (sirkaNaMesic < 6)   typZobrazeni = "carka";
+        if (sirkaNaMesic < 1.5) typZobrazeni = "vypustit";
+
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+
+        for (let i = 0; i < tasHistorie.length; i++) {
+            const rok = popiskyRokuGrafu[i];
+            const mIndex = indexyMesicuGrafu[i];
+            const xPos = getGslX(i);
+
+            if (vlastnost === "ALL") {
+                if (rok % 10 === 0 || i === 0 || i === tasHistorie.length - 1) {
+                    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(xPos, padTop); ctx.lineTo(xPos, padTop + gHeight); ctx.stroke();
+                    ctx.fillStyle = "#000"; ctx.font = "bold 14px sans-serif";
+                    ctx.fillText(rok, xPos, padTop + gHeight + 15);
+                }
+            } else {
+                if (rok % 10 === 0) {
+                    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(xPos, padTop); ctx.lineTo(xPos, padTop + gHeight); ctx.stroke();
+                    ctx.fillStyle = "#000"; ctx.font = "bold 14px sans-serif";
+                    ctx.fillText(rok, xPos, padTop + gHeight + 25);
+                } else if (typZobrazeni !== "vypustit") {
+                    ctx.strokeStyle = "rgba(0,0,0,0.15)";
+                    ctx.lineWidth = 0.9;
+                    ctx.beginPath(); ctx.moveTo(xPos, padTop); ctx.lineTo(xPos, padTop + gHeight); ctx.stroke();
+                }
+
+                ctx.fillStyle = "#666"; ctx.font = "12px sans-serif";
+
+                if (typZobrazeni === "nazev") {
+                    ctx.fillText(`${rok} (${mesiceNazvy[mIndex]})`, xPos, padTop + gHeight + 5);
+                } else if (typZobrazeni === "cislo") {
+                    if (rok % 2 === 0) ctx.fillText(rok, xPos, padTop + gHeight + 5);
+                } else if (typZobrazeni === "index") {
+                    if (i % 5 === 0) ctx.fillText(rok, xPos, padTop + gHeight + 5);
+                } else if (typZobrazeni === "carka") {
+                    if (rok % 5 === 0) {
+                        ctx.strokeStyle = "rgba(0,0,0,0.4)";
+                        ctx.beginPath(); ctx.moveTo(xPos, padTop + gHeight); ctx.lineTo(xPos, padTop + gHeight + 6); ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        // --- ČÁRA A: SUROVÁ MEZIROČNÍ TEPLOTA (Zelená linie) ---
+        ctx.beginPath(); ctx.strokeStyle = "#2e7d32"; ctx.lineWidth = 3;
+        let pBodSurovy = true;
+        for (let i = 0; i < tasHistorie.length; i++) {
+            if (tasHistorie[i] === null) continue;
+            if (pBodSurovy) { ctx.moveTo(getGslX(i), getGslY(tasHistorie[i])); pBodSurovy = false; }
+            else { ctx.lineTo(getGslX(i), getGslY(tasHistorie[i])); }
+        }
+        ctx.stroke();
+
+        // --- ČÁRA B: HISTORICKÝ KLOUZAVÝ DYNAMICKÝ AGRO-TREND (Oranžová křivka) ---
+        let k_okno = 5; 
+        if (trendSegmentVolba === "0") k_okno = Math.floor(tasHistorie.length / 2);
+        else if (trendSegmentVolba !== "NONE") k_okno = Math.floor(parseInt(trendSegmentVolba) / 2);
+
+        const vyhlazenaRadaGsl = [];
+        for (let i = 0; i < tasHistorie.length; i++) {
+            let sum = 0, c = 0;
+            const s = Math.max(0, i - k_okno), k = Math.min(tasHistorie.length - 1, i + k_okno);
+            for(let j = s; j <= k; j++) { if(tasHistorie[j] !== null) { sum += tasHistorie[j]; c++; } }
+            vyhlazenaRadaGsl.push(c > 0 ? sum / c : null);
+        }
+
+        if (zobrazitTrendy) {
+            ctx.beginPath(); ctx.strokeStyle = "#e65100"; ctx.lineWidth = 4;
+            let pBod = true;
+            for (let i = 0; i < vyhlazenaRadaGsl.length; i++) {
+                if (vyhlazenaRadaGsl[i] !== null) {
+                    if (pBod) { ctx.moveTo(getGslX(i), getGslY(vyhlazenaRadaGsl[i])); pBod = false; }
+                    else ctx.lineTo(getGslX(i), getGslY(vyhlazenaRadaGsl[i]));
+                }
+            }
+            ctx.stroke();
+        }
+
+
+
+
+// --- ČÁRA D: HISTORICKÝ PERCENTIL KLIMATICKÉHO OTEPLENÍ ZA CELÉ OBDOBÍ (Čnerrá linie) ---
+if (rezimPercentil) {
+ctx.beginPath(); ctx.strokeStyle = "#000000"; ctx.lineWidth = 3;
+let prvyP = true;
+for (let i = 0; i < tasHistorie.length; i++) {
+if (tasHistorie[i] === null) continue;
+let nNiz = 0; tasHistorie.forEach(v => { if (v !== null && v < tasHistorie[i]) nNiz++; });
+const perc = (nNiz / tasHistorie.length) * rozsahY + minVal;
+if (prvyP) { ctx.moveTo(getGslX(i), getGslY(perc)); prvyP = false; }
+else ctx.lineTo(getGslX(i), getGslY(perc));
+}
+ctx.stroke();
+}
+// Načtení souřadnic z textového pole pro dynamický titulek v Canvasu
+let latZobraz = lat; let lonZobraz = lon;
+const gpsVstup = document.getElementById('gps_vstup').value;
+if(gpsVstup) {
+const castiGps = gpsVstup.split(',').map(num => parseFloat(num.trim()));
+if(castiGps.length === 2 && !isNaN(castiGps[0])) {
+latZobraz = castiGps[0].toFixed(4);
+lonZobraz = castiGps[1].toFixed(4);
+}
+}
+// Výběr textu z optionu přes selectedOptions[0].innerHTML
+const lokalitaSelect = document.getElementById("trend_mesic");
+const val = lokalitaSelect.selectedOptions[0].text;
+
+// Výpočet bilancí a plnění spodního panelu metaGsl podle vaší šablony
+const cddStartTrend = vyhlazenaRadaGsl[0] !== null ? vyhlazenaRadaGsl[0].toFixed(1) : "0";
+const cddKonecTrend = vyhlazenaRadaGsl[vyhlazenaRadaGsl.length - 1] !== null ? vyhlazenaRadaGsl[vyhlazenaRadaGsl.length - 1].toFixed(1) : "0";
+let popisekTrenduText = `Vyhlazený ${trendSegmentVolba}letý klimatický trend`;
+let nazevTrenduProPanel = `${trendSegmentVolba}letém`;
+let zac = ``;
+let kon = ``;
+let roz = ``;
+
+ if (trendSegmentVolba !== "NONE") {
+ zac = `, v ${nazevTrenduProPanel} <b>trendu ${cddStartTrend} °C</b>`;
+ kon = `, v ${nazevTrenduProPanel} <b>trendu ${cddKonecTrend} °C</b>`;
+ roz = `, v ${nazevTrenduProPanel} <b>trendu je to ${(cddKonecTrend - cddStartTrend).toFixed(1)} °C</b> oteplení`;
+}
+
+if (trendSegmentVolba === "0") {
+popisekTrenduText = "Vyhlazený celoobdobový trend"; nazevTrenduProPanel = "5letém";
+}
+// Vykreslení textů a legendy do Canvasu
+ctx.fillStyle = "#333"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "left";
+ctx.fillText(`${val} (${rokOd} - ${rokDo})`, padLeft, padTop - 45); // Přidán rozsah a měsíc
+ctx.fillText("Předpověď průměrné teploty vzduchu (SSP4-6.0) pro souřadnice lat "+latZobraz+" lon "+lonZobraz+" ", padLeft, padTop - 25);
+ctx.fillStyle = "#2e7d32"; ctx.fillText("■ Meziroční data", padLeft + 730, padTop - 25);
+if (zobrazitTrendy) {
+ctx.fillStyle = "#e65100"; ctx.fillText(`■ ${popisekTrenduText}`, padLeft + 950, padTop - 25);
+}
+if (rezimPercentil) {
+ctx.fillStyle = "#000000"; ctx.fillText("■ Historický percentil za celé období", padLeft + (zobrazitTrendy ? 1280 : 950), padTop - 25);
+}
+metaGsl.innerHTML = `Kliknutím na graf ho zvětšíte a obráceně.<br> <h4 style="margin:10px;text-align: center;">Projekce přízemní teploty vzduchu do roku 2099 (SSP4-6.0)</h4> Rok ${rokOd} měl v ${val} <b>${tasHistorie[0].toFixed(1)} °C</b>${zac}. <br> V roce ${rokDo} předpověď odhaduje <b>${tasHistorie[tasHistorie.length - 1].toFixed(1)} °C</b>${kon}. <br> Rozdíl v průměrné teplotě mezi těmito roky je <b>${(tasHistorie[tasHistorie.length - 1] - tasHistorie[0]).toFixed(1)} °C</b>${roz}.` ;
+} catch (err) {
+metaGsl.innerHTML = `<span style="color:#d32f2f;">Projekční graf: ${err.message}</span>`;
+}
+}
+// Inicializační spouštěč po úplném načtení DOM stromu webu
+document.addEventListener("DOMContentLoaded", function() {
+prekresliGslMapu();
+});
+
+
+    
+</script>
+
+</body>
+</html>
+
