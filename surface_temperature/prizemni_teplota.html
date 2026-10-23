@@ -8,33 +8,65 @@
     <script src="leaflet.min.js"></script>
 
 <style>
-    body { margin: 0; padding: 0; font-family: sans-serif; display: flex; height: 100vh; }
-    #mapa-kontainer {  flex-grow: 1; height: 100%; margin: 0px;}
+    body { margin: 0; padding: 0; font-family: sans-serif; display: flex; height: 100vh; /*width: 100vw;*/ }
+    #mapa-kontainer {  flex-grow: 1; height: 100%; margin: 0px; }
     .vegetacni-panel {
         position: relative; /* Nutné pro správné umístění táhla */
         height: 100%; 
-        display: flex; 
+        display: none; 
         flex-direction: column; 
         gap: 0px; 
-        width: 500px;       /* Výchozí šířka panelu při načtení */
+        width: 35%;       /* Výchozí šířka panelu při načtení */
         min-width: 20%;   /* Minimální šířka */
         max-width: 90%;   /* maximální šířka */
         margin: 0px; 
         background: #fff; 
         padding: 0px 5px 0px 15px;
         overflow-y: auto;  
+  opacity: 1;
+	transition: width 0.2s;
     }
     .resizer {
         width: 8px;
         height: 100%;
-        position: absolute;
+        position: relative;
         background: #ddd;
         top: 0px;
         left: 0px;
         cursor: col-resize; /* Změní kurzor na šipky vlevo/vpravo */
         user-select: none;  /* Zabrání označování textu při tažení */
     }
-    .resizer:hover { background: #d8d8d8; }
+    .resizer:hover { background: #d6d6d6; }
+    .resizer2 {
+width: 17px;
+  height: 30px;
+  position: absolute;
+  background: #ddd;
+  left: 0px;
+  top: 50%;
+  transform: translate(0%, -50%);
+  z-index: 1000;
+  border-radius: 0px 4px 4px 0px;
+    }
+    .resizer3 {
+width: 100%;
+  height: 30px;
+  position: absolute;
+  background: #cecdcd;
+  right: 0px;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 2px 6px 6px 2px;
+  opacity: 0.25;
+	border: 0px solid rgba(255, 255, 255, 0);
+	box-shadow: -1px -1px 3px #fafafa7a , 1px 1px 3px #0606067a , inset 7px 7px 12px #fafafa17 , inset -3px -7px 9px #06060621 , inset 7px 13px 13px #fafafa14 , inset -1px -1px 1px #06060652, inset 1px 1px 1px #fafafa4a;
+	transition: box-shadow 0.1s, background 0.1s;
+    }
+    .resizer3:hover { 
+	background: #42414140;
+	box-shadow: -2px -2px 9px #06060600 , 2px 2px 9px #fff0 , inset 7px 7px 12px #0000001a, inset -3px -7px 9px #ffffff12 , inset -7px -13px 13px #ffffff08 , inset -1px -1px 1px #ffffffc7, inset 1px 1px 1px #0606065c;
+	transition: box-shadow 0.1s, background 0.1s;
+	 }
     table.pudni-tabulka { width: 100%; border-collapse: collapse; margin-top: 0px; font-size: 12px; }
     table.pudni-tabulka th, table.pudni-tabulka td { border: 1px solid #ddd; padding: 3px; text-align: center; }
     table.pudni-tabulka th { background: #e4f0d6; color: #335e23; }
@@ -50,6 +82,8 @@
 <body>
 
 <div id="mapa-kontainer"></div>
+
+    <div class="resizer"><div class="resizer2"><div class="resizer3"></div></div></div>
 
 <div class="vegetacni-panel">
 	
@@ -141,8 +175,6 @@
         Kliknutím do mapy zobrazíte graf budoucího vývoje na daných souřadnicích.
     </div>
 </div>
-
-    <div class="resizer"></div>
     
 </div>
 
@@ -151,7 +183,36 @@
 	
 const panel = document.querySelector('.vegetacni-panel');
 const resizer = document.querySelector('.resizer');
+const resizer2 = document.querySelector('.resizer2');
+const resizer3 = document.querySelector('.resizer3');
 resizer.addEventListener('mousedown', initResize, false);
+resizer2.addEventListener('mousedown', poz, false);
+
+function poz() {
+	if(panel.style.width !== "0px"){
+    panel.style.opacity = "0";
+   setTimeout( function () { panel.style.minWidth = "0px";
+    panel.style.width = "0px";
+    panel.style.padding = "0px";
+    resizer.style.width = "0px";
+    resizer2.style.left = "-28px";
+    resizer2.style.width = "25px";
+    resizer2.style.transform = "scaleX(-1)";
+    resizer3.style.opacity = "1";
+	panel.style.transition = "width 0.2s"; } , 50 );
+} else {
+    panel.style.minWidth = "20%";
+    panel.style.width = "35%";
+    panel.style.padding = "0px 5px 0px 15px";
+    resizer.style.width = "8px";
+    resizer2.style.left = "0px";
+    resizer2.style.width = "17px";
+    resizer2.style.transform = "scaleX(1)";
+    resizer3.style.opacity = "0.25";
+    setTimeout( function () { panel.style.opacity = "1"; } , 200 );
+	
+}
+}
 
 function initResize(e) {
     e.preventDefault();
@@ -640,12 +701,12 @@ popisekTrenduText = "Vyhlazený celoobdobový trend"; nazevTrenduProPanel = "5le
 ctx.fillStyle = "#333"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "left";
 ctx.fillText(`${val} (${rokOd} - ${rokDo})`, padLeft, padTop - 45); // Přidán rozsah a měsíc
 ctx.fillText("Předpověď průměrné teploty vzduchu (SSP4-6.0) pro souřadnice lat "+latZobraz+" lon "+lonZobraz+" ", padLeft, padTop - 25);
-ctx.fillStyle = "#2e7d32"; ctx.fillText("■ Meziroční data", padLeft + 730, padTop - 25);
+ctx.fillStyle = "#2e7d32"; ctx.fillText("■ Meziroční data", padLeft + 700, padTop - 25);
 if (zobrazitTrendy) {
-ctx.fillStyle = "#e65100"; ctx.fillText(`■ ${popisekTrenduText}`, padLeft + 950, padTop - 25);
+ctx.fillStyle = "#e65100"; ctx.fillText(`■ ${popisekTrenduText}`, padLeft + 850, padTop - 25);
 }
 if (rezimPercentil) {
-ctx.fillStyle = "#000000"; ctx.fillText("■ Historický percentil za celé období", padLeft + (zobrazitTrendy ? 1280 : 950), padTop - 25);
+ctx.fillStyle = "#000000"; ctx.fillText("■ Historický percentil za celé období", padLeft + (zobrazitTrendy ? 1150 : 850), padTop - 25);
 }
 metaGsl.innerHTML = `Kliknutím na graf ho zvětšíte a obráceně.<br> <h4 style="margin:10px;text-align: center;">Projekce přízemní teploty vzduchu do roku 2099 (SSP4-6.0)</h4> Rok ${rokOd} měl v ${val} <b>${tasHistorie[0].toFixed(1)} °C</b>${zac}. <br> V roce ${rokDo} předpověď odhaduje <b>${tasHistorie[tasHistorie.length - 1].toFixed(1)} °C</b>${kon}. <br> Rozdíl v průměrné teplotě mezi těmito roky je <b>${(tasHistorie[tasHistorie.length - 1] - tasHistorie[0]).toFixed(1)} °C</b>${roz}.` ;
 } catch (err) {
@@ -655,6 +716,7 @@ metaGsl.innerHTML = `<span style="color:#d32f2f;">Projekční graf: ${err.messag
 // Inicializační spouštěč po úplném načtení DOM stromu webu
 document.addEventListener("DOMContentLoaded", function() {
 prekresliGslMapu();
+    panel.style.display = "flex";
 });
 
 
