@@ -245,127 +245,138 @@ if (selOd && selDo && selOd.options.length === 0) {
 }
 
 // =============================================================================
-// CENTRALIZOVANÝ DATAMANAŽER S BOUNDING-BOX FRONTOU (ZERO-COPY BUFFER)
+// CENTRALIZOVANÝ DATAMANAŽER: cache dlaždic v RAM + fronta + jediný POST na dávku
 // =============================================================================
-class GlobalniEvapoDataManager {
+// Princip: dlaždice (32x32 bodů x 1020 měsíců, 1 bajt na hodnotu, 255 = chybí)
+// se drží rozbalené jako jedno Uint8Array. Žádné řetězcové klíče ani kopie
+// po bodech – čtení bodu je jen aritmetika a zero-copy subarray().
+class GlobálníEvapoDataManager {
     constructor() {
-        this.cache = new Map();
-        this.frontaPožadavků = new Map();
-        this.debounceTimer = null;
-        this.odkladZpracovaniMs = 35;
-        
-        // Parametry Gaussovy mřížky pro klientský přepočet
+        this.dlazdice = new Map();     // tile_index -> Uint8Array (rozbalená dlaždice)
+        this.rozpracovane = new Map(); // tile_index -> Promise (čeká ve frontě / stahuje se)
+        this.fronta = new Map();       // tile_index -> {resolve, reject} (ještě neodesláno)
+        this.timer = null;
+        this.odkladMs = 35;            // okno pro sběr požadavků z mapy
+
         this.ncols = 256; this.nrows = 128;
         this.xdim = 1.40625; this.ydim = 1.40625;
         this.ulx = 0.0; this.uly = 88.92774;
-    }
-    
-ziskejDataBodu(lat, lon) {
-    const klic = `${parseFloat(lat).toFixed(4)}_${parseFloat(lon).toFixed(4)}`;
-    
-    if (this.cache.has(klic)) {
-        return Promise.resolve(this.cache.get(klic));
-    }
-    if (this.frontaPožadavků.has(klic)) {
-        return this.frontaPožadavků.get(klic).promise;
+        this.tile_size = 32; this.dlazdic_x = 8;
+        this.mesicu = CELKEM_MESICU_TAS;
+        this.bajtuDlazdice = this.tile_size * this.tile_size * this.mesicu;
     }
 
-    let deferred = {};
-    deferred.promise = new Promise((resolve, reject) => {
-        deferred.resolve = resolve;
-        deferred.reject = reject;
-    });
-
-    // Uložíme do fronty objekt s deferred strukturou
-    this.frontaPožadavků.set(klic, { lat, lon, promise: deferred.promise, deferred: deferred });
-    this.naplánujOdesláníFronty();
-    
-    // KLÍČOVÁ OPRAVA: Nyní metoda striktně vrací Promise, takže .then() už nikdy neselže!
-    return deferred.promise;
-}
-
-
-    naplánujOdesláníFronty() {
-        if (this.debounceTimer) clearTimeout(this.debounceTimer);
-        this.debounceTimer = setTimeout(() => this.odesliFrontuNaServer(), this.odkladZpracovaniMs);
+    // GPS -> uzel mřížky + index dlaždice (lon se správně obtáčí přes 360°)
+    uzel(lat, lon) {
+        let l = parseFloat(lon) % 360; if (l < 0) l += 360;
+        const col = Math.round((l - this.ulx) / this.xdim) % this.ncols;
+        const row = Math.max(0, Math.min(this.nrows - 1, Math.round((this.uly - parseFloat(lat)) / this.ydim)));
+        const tile = Math.floor(row / this.tile_size) * this.dlazdic_x + Math.floor(col / this.tile_size);
+        return { col, row, tile };
     }
 
-    async odesliFrontuNaServer() {
-        if (this.frontaPožadavků.size === 0) return;
+    // SYNCHRONNÍ čtení časové řady uzlu (Uint8Array 1020 hodnot, 255 = chybí) nebo null, pokud dlaždice není v RAM
+    bajtyUzlu(col, row) {
+        const t = this.dlazdice.get(Math.floor(row / this.tile_size) * this.dlazdic_x + Math.floor(col / this.tile_size));
+        if (!t) return null;
+        const o = ((row % this.tile_size) * this.tile_size + (col % this.tile_size)) * this.mesicu;
+        return t.subarray(o, o + this.mesicu);
+    }
 
-        const mistniKopieFronty = new Map(this.frontaPožadavků);
-        this.frontaPožadavků.clear();
+    // Zajistí, že všechny dané dlaždice jsou v RAM. Chybějící zařadí do fronty (jedna dávka = jeden POST).
+    zajisti(tileIds) {
+        const sliby = [];
+        for (const id of tileIds) sliby.push(this._pozadej(id));
+        return Promise.all(sliby);
+    }
 
-        // 1. Spočítáme minimální a maximální indexy mřížky pro celou frontu (Bounding Box)
-let r_min = 128, r_max = 0, c_min = 256, c_max = 0;
+    _pozadej(id) {
+        if (this.dlazdice.has(id)) return Promise.resolve();
+        let p = this.rozpracovane.get(id);
+        if (p) return p;                       // už ve frontě nebo se stahuje -> nestahovat dvakrát
+        p = new Promise((resolve, reject) => this.fronta.set(id, { resolve, reject }));
+        this.rozpracovane.set(id, p);
+        if (this.timer) clearTimeout(this.timer);
+        this.timer = setTimeout(() => this._odesli(), this.odkladMs);
+        return p;
+    }
 
-mistniKopieFronty.forEach(polozka => {
-    let cur_lon = polozka.lon;
-    if (cur_lon < 0) cur_lon += 360.0;
-    
-    let col = Math.max(0, Math.min(this.ncols - 1, Math.round((cur_lon - this.ulx) / this.xdim)));
-    let row = Math.max(0, Math.min(this.nrows - 1, Math.round((this.uly - polozka.lat) / this.ydim)));
+    async _odesli() {
+        this.timer = null;
+        const davka = Array.from(this.fronta.entries());
+        this.fronta.clear();
+        if (davka.length === 0) return;
 
-    if (row < r_min) r_min = row; if (row > r_max) r_max = row;
-    if (col < c_min) c_min = col; if (col > c_max) c_max = col;
-});
-
+        const selhani = (err) => davka.forEach(([id, cb]) => { this.rozpracovane.delete(id); cb.reject(err); });
 
         try {
-            // 2. Voláme server s ultra-krátkou URL adresou (Bleskové vyříznutí matice)
-            const res = await fetch(`get_evapo_bin.php?r_min=${r_min}&r_max=${r_max}&c_min=${c_min}&c_max=${c_max}`);
-            if (!res.ok) throw new Error("Chyba síťového proudu");
-            
-            const buffer = await res.arrayBuffer();
-            const surovaUint8Matice = new Uint8Array(buffer);
-
-            // 3. Rozdistribuujeme surové bajty z vyříznutého obdélníku do paměti jednotlivých GPS klíčů
-            const sirkaObdelniku = (c_max - c_min) + 1;
-
-            mistniKopieFronty.forEach((polozka, klic) => {
-                let cur_lon = polozka.lon;
-                if (cur_lon < 0) cur_lon += 360.0;
-                
-                let col = Math.max(0, Math.min(this.ncols - 1, Math.round((cur_lon - this.ulx) / this.xdim)));
-                let row = Math.max(0, Math.min(this.nrows - 1, Math.round((this.uly - polozka.lat) / this.ydim)));
-
-                // Spočítáme, kde v přijatém obdélníku leží data tohoto konkrétního sub-pixelu
-                const mistni_r = row - r_min;
-                const mistni_c = col - c_min;
-                const indexPixeluVObdelniku = (mistni_r * sirkaObdelniku) + mistni_c;
-                const byteOffset = indexPixeluVObdelniku * CELKEM_MESICU_TAS;
-
-                const kouskyBajtůBodu = surovaUint8Matice.subarray(byteOffset, byteOffset + CELKEM_MESICU_TAS);
-
-                const rozbalenePoleMm = new Float32Array(CELKEM_MESICU_TAS);
-                for (let j = 0; j < CELKEM_MESICU_TAS; j++) {
-                    rozbalenePoleMm[j] = this.dekodujBajtEvapo(kouskyBajtůBodu[j]);
-                }
-
-                this.cache.set(klic, rozbalenePoleMm);
-                polozka.deferred.resolve(rozbalenePoleMm);
+            const res = await fetch('get_evapo_post.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tile_ids: davka.map(d => d[0]) })
             });
+            if (!res.ok) throw new Error("Server vrátil HTTP " + res.status + " " + (await res.text()).slice(0, 200));
 
+            const buf = await res.arrayBuffer();
+            const view = new DataView(buf);
+            let off = 0;
+
+            // 1) nejdřív rozřezat celý stream (při chybě formátu nezačneme nic rozbalovat)
+            const useky = [];
+            for (const [id, cb] of davka) {
+                if (off + 4 > buf.byteLength) throw new Error("Zkrácená odpověď serveru (chybí hlavička dlaždice " + id + ")");
+                const delka = view.getUint32(off, false); off += 4;
+                if (off + delka > buf.byteLength) throw new Error("Zkrácená odpověď serveru (dlaždice " + id + ")");
+                useky.push({ id, cb, gz: new Uint8Array(buf, off, delka) });
+                off += delka;
+            }
+
+            // 2) rozbalit paralelně; každá dlaždice vyřeší/zamítne jen své čekatele
+            await Promise.all(useky.map(u => this._rozbal(u)));
         } catch (err) {
-            mistniKopieFronty.forEach(polozka => polozka.deferred.reject(err));
+            console.error("Chyba hromadného POST načtení dlaždic:", err);
+            selhani(err);
         }
     }
 
-    dekodujBajtEvapo(bajt) {
-        if (bajt === 255) return null;
-        if (bajt <= 240) return bajt;
-        switch(bajt) {
-            case 241: return 248.0; case 242: return 265.0; case 243: return 288.0;
-            case 244: return 315.0; case 245: return 348.0; case 246: return 385.0;
-            case 247: return 428.0; case 248: return 475.0; case 249: return 525.0;
-            case 250: return 575.0; default: return 600.0;
+    async _rozbal({ id, cb, gz }) {
+        try {
+            let data;
+            if (gz.length === 0) {
+                data = new Uint8Array(this.bajtuDlazdice).fill(255);   // dlaždice bez dat
+            } else {
+                data = await this.rozbalGzip(gz);
+                if (data.length !== this.bajtuDlazdice) {
+                    throw new Error(`Dlaždice ${id}: po rozbalení ${data.length} B, očekáváno ${this.bajtuDlazdice} B (32x32x${this.mesicu})`);
+                }
+            }
+            this.dlazdice.set(id, data);
+            this.rozpracovane.delete(id);
+            cb.resolve();
+        } catch (e) {
+            this.rozpracovane.delete(id);
+            cb.reject(e);
         }
+    }
+
+    async rozbalGzip(uint8Data) {
+        const stream = new Blob([uint8Data]).stream().pipeThrough(new DecompressionStream("gzip"));
+        return new Uint8Array(await new Response(stream).arrayBuffer());
+    }
+
+    // Pro graf: řada jednoho bodu jako běžné pole s null pro chybějící hodnoty (zbytek kódu grafu zůstává beze změny)
+    async ziskejDataBodu(lat, lon) {
+        const u = this.uzel(lat, lon);
+        await this.zajisti([u.tile]);
+        const b = this.bajtyUzlu(u.col, u.row);
+        return Array.from(b, v => v === 255 ? null : v);
     }
 }
 
-const gslKlientskaPamet = new GlobalniEvapoDataManager();
+const gslKlientskaPamet = new GlobálníEvapoDataManager();
 let gslTileLayerLeaflet = null;
 let aktualniMarker = null;
+
 
 
 // =============================================================================
@@ -441,105 +452,85 @@ function prekresliGslMapu() {
     document.getElementById("legenda-titulek").innerText = "Legenda: Projekce celkové evapotranspirace (mm/měsíc)";
 
     gslTileLayerLeaflet = L.gridLayer({ tileSize: 256, opacity: 0.45 });
-    gslTileLayerLeaflet.createTile = function(coords) {
+
+    const MISSING = 255, krok = 16, stinRadius = 18;
+    legendySkaly.forEach(l => { l.transparentni = l.barva.replace("rgb", "rgba").replace(")", ", 0)"); });
+
+    // Hodnota pro mapu z jedné řady (Uint8Array, 255 = chybí); logika shodná s původní
+    function hodnotaMapy(h, indexRoku, vlastnost, trendVolba, k_let) {
+        const len = h.length;
+        if (vlastnost === "ALL" || vlastnost === "CONTINUOUS") {
+            const rStart = Math.max(0, indexRoku - k_let);
+            const rKonec = Math.min(Math.floor(len / 12) - 1, indexRoku + k_let);
+            let suma = 0, n = 0;
+            for (let i = rStart * 12; i < (rKonec + 1) * 12; i++) { const v = h[i]; if (v !== MISSING) { suma += v; n++; } }
+            return n > 0 ? suma / n : null;
+        }
+        const mesic = parseInt(vlastnost);
+        const cist = indexRoku * 12 + mesic;
+        if (cist >= len) return null;
+        if (trendVolba !== "NONE") {
+            const s = Math.max(mesic, cist - k_let * 12), k = Math.min(len - 1, cist + k_let * 12);
+            let suma = 0, n = 0;
+            for (let j = s; j <= k; j += 12) { const v = h[j]; if (v !== MISSING) { suma += v; n++; } }
+            if (n > 0) return suma / n;
+        }
+        const v = h[cist];
+        return v === MISSING ? null : v;
+    }
+
+    gslTileLayerLeaflet.createTile = function(coords, done) {
         const tile = L.DomUtil.create('canvas', 'leaflet-tile');
         const ctx = tile.getContext('2d');
         tile.width = tile.height = this.options.tileSize;
 
-        const aktivniRok = parseInt(document.getElementById("gsl_rok_slider").value);
-        const indexRoku = aktivniRok - START_ROK_TAS;
-        const trendSegmentVolba = document.getElementById("trend_segment").value;
-        const krok = 16; 
+        const indexRoku = parseInt(document.getElementById("gsl_rok_slider").value) - START_ROK_TAS;
+        const trendVolba = document.getElementById("trend_segment").value;
+        let k_let = 0;
+        if (trendVolba === "0") k_let = Math.floor((2099 - START_ROK_TAS) / 2);
+        else if (trendVolba !== "NONE") k_let = Math.floor(parseInt(trendVolba) / 2);
 
-        const seznamSubPixelu = [];
+        // 1) Synchronně zjistit, které uzly mřížky a dlaždice tahle dlaždice mapy potřebuje
+        const body = [], ids = new Set();
         for (let y = 0; y < 256; y += krok) {
             for (let x = 0; x < 256; x += krok) {
-                const gPoint = map.unproject([coords.x * 256 + x, coords.y * 256 + y], coords.z);
-                seznamSubPixelu.push({ x, y, lat: gPoint.lat, lon: gPoint.lng });
+                const g = map.unproject([coords.x * 256 + x, coords.y * 256 + y], coords.z);
+                const u = gslKlientskaPamet.uzel(g.lat, g.lng);
+                body.push({ x, y, col: u.col, row: u.row });
+                ids.add(u.tile);
             }
         }
 
-        setTimeout(async () => {
-            const slibyBodu = seznamSubPixelu.map(sp => 
-                gslKlientskaPamet.ziskejDataBodu(sp.lat, sp.lon)
-                    .then(data => ({ ...sp, data }))
-                    .catch(() => ({ ...sp, data: null }))
-            );
-
-            const vysledkyBodu = await Promise.all(slibyBodu);
-
-            vysledkyBodu.forEach(pb => {
-                if (pb.data) {
-                    const historieEvapo = pb.data;
-                    const startMěsícRoku = indexRoku * 12;
-                    let vyhlazeneMm = null;
-
-                    let k_let = 0;
-                    if (trendSegmentVolba !== "NONE" && trendSegmentVolba !== "0") {
-                        k_let = Math.floor(parseInt(trendSegmentVolba) / 2);
-                    } else if (trendSegmentVolba === "0") {
-                        k_let = Math.floor((2099 - START_ROK_TAS) / 2);
-                    }
-
-                    if (vlastnost === "ALL" || vlastnost === "CONTINUOUS") {
-                        let sumaRoku = 0, countRoku = 0;
-                        const rStart = Math.max(0, indexRoku - k_let);
-                        const rKonec = Math.min(Math.floor(historieEvapo.length / 12) - 1, indexRoku + k_let);
-                        
-                        for (let rIdx = rStart; rIdx <= rKonec; rIdx++) {
-                            for (let m = 0; m < 12; m++) {
-                                const v = historieEvapo[rIdx * 12 + m];
-                                if (v !== null) { sumaRoku += v; countRoku++; }
-                            }
-                        }
-                        vyhlazeneMm = countRoku > 0 ? (sumaRoku / countRoku) : null;
-                    } else {
-                        const cistyIndexMesice = startMěsícRoku + parseInt(vlastnost);
-                        
-                        if (trendSegmentVolba !== "NONE") {
-                            let sumOkna = 0, countOkna = 0;
-                            const sOkna = Math.max(parseInt(vlastnost), cistyIndexMesice - (k_let * 12));
-                            const kOkna = Math.min(historieEvapo.length - 1, cistyIndexMesice + (k_let * 12));
-                            
-                            for (let j = sOkna; j <= kOkna; j += 12) {
-                                // KOREKCE: Odstraněno chybné vnitřní rovnítko, porovnáváme čistě a bezpečně
-                                if (historieEvapo[j] !== null && historieEvapo[j] !== undefined) { 
-                                    sumOkna += historieEvapo[j]; 
-                                    countOkna++; 
-                                }
-                            }
-                            vyhlazeneMm = countOkna > 0 ? (sumOkna / countOkna) : historieEvapo[cistyIndexMesice];
-                        } else {
-                            vyhlazeneMm = historieEvapo[cistyIndexMesice];
-                        }
-                    }
-
-                    if (vyhlazeneMm !== null && vyhlazeneMm !== undefined) {
-                        const match = legendySkaly.find(l => vyhlazeneMm >= l.min && vyhlazeneMm < l.max);
-                        if (match) {
-                            const barva = match.barva; const stinRadius = 18;
-                            const centerX = pb.x + krok / 2; const centerY = pb.y + krok / 2;
-                            const gradient = ctx.createRadialGradient(centerX, centerY, krok / 2, centerX, centerY, stinRadius);
-                            gradient.addColorStop(0, barva);
-                            const transparentniBarva = barva.replace("rgb", "rgba").replace(")", ", 0)");
-                            gradient.addColorStop(1, transparentniBarva);
-
-                            ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = gradient;
-                            ctx.fillRect(pb.x - stinRadius, pb.y - stinRadius, krok + stinRadius * 2, krok + stinRadius * 2);
-                        } else { ctx.globalCompositeOperation = 'source-over'; }
-                    }
+        // 2) Jedno čekání na všechno (fronta se odešle jedním POSTem), pak čistě synchronní kreslení
+        gslKlientskaPamet.zajisti(ids).then(() => {
+            const hodnoty = new Map();   // uzel -> hodnota (při malém zoomu spadá hodně pixelů do stejného uzlu)
+            for (const pb of body) {
+                const klic = pb.row * 256 + pb.col;
+                let mm = hodnoty.get(klic);
+                if (mm === undefined) {
+                    const h = gslKlientskaPamet.bajtyUzlu(pb.col, pb.row);
+                    mm = h ? hodnotaMapy(h, indexRoku, vlastnost, trendVolba, k_let) : null;
+                    hodnoty.set(klic, mm);
                 }
-            });
-        }, 0);
+                if (mm === null) continue;
+                const match = legendySkaly.find(l => mm >= l.min && mm < l.max);
+                if (!match) continue;
+                const cx = pb.x + krok / 2, cy = pb.y + krok / 2;
+                const gradient = ctx.createRadialGradient(cx, cy, krok / 2, cx, cy, stinRadius);
+                gradient.addColorStop(0, match.barva);
+                gradient.addColorStop(1, match.transparentni);
+                ctx.fillStyle = gradient;
+                ctx.fillRect(pb.x - stinRadius, pb.y - stinRadius, krok + stinRadius * 2, krok + stinRadius * 2);
+            }
+            done(null, tile);
+        }).catch(err => { console.error("Dlaždice mapy:", err); done(err, tile); });
+
         return tile;
     };
     gslTileLayerLeaflet.addTo(map);
 }
 
 
-map.on('zoomend', function() {
-    if (document.getElementById("trend_mesic").value !== "NONE") prekresliGslMapu();
-});
 
 // =============================================================================
 // 4. INTERAKTIVNÍ GRAF S ADAPTIVNÍ OSOU X PODLE HUSTOTY SPEI-6
