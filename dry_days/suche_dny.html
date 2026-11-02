@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Projekce po sobě jdoucích suchých dnů (CDD)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="leaflet.min.css">
+    <script src="leaflet.min.js"></script>
+
+<style>
+    body { margin: 0; padding: 0; font-family: sans-serif; display: flex; height: 100vh; }
+    #mapa-kontainer {  flex-grow: 1; height: 100%; margin: 0px;}
+    .vegetacni-panel {
+        position: relative; /* Nutné pro správné umístění táhla */
+        height: 100%; 
+        display: flex; 
+        flex-direction: column; 
+        gap: 0px; 
+        width: 500px;       /* Výchozí šířka panelu při načtení */
+        min-width: 20%;   /* Minimální šířka */
+        max-width: 90%;   /* maximální šířka */
+        margin: 0px; 
+        background: #fff; 
+        padding: 0px 5px 0px 15px;
+        overflow-y: auto;  
+    }
+    .resizer {
+        width: 8px;
+        height: 100%;
+        position: absolute;
+        background: #ddd;
+        top: 0px;
+        left: 0px;
+        cursor: col-resize; /* Změní kurzor na šipky vlevo/vpravo */
+        user-select: none;  /* Zabrání označování textu při tažení */
+    }
+    table.pudni-tabulka { width: 100%; border-collapse: collapse; margin-top: 0px; font-size: 12px; }
+    table.pudni-tabulka th, table.pudni-tabulka td { border: 1px solid #ddd; padding: 3px; text-align: center; }
+    table.pudni-tabulka th { background: #e4f0d6; color: #335e23; }
+    .dominantni-info { color: #3d3d3d; margin-bottom: 15px; }
+    .controls { margin-bottom: 5px; padding: 5px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+    input, select, button { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+    button { background: #2e7d32; color: white; border: none; cursor: pointer; font-weight: bold; }
+    button:hover { background: #1b5e20; }
+</style>
+
+</head>
+<body>
+
+<div id="mapa-kontainer"></div>
+
+<div class="vegetacni-panel">
+	
+    <h4 style="margin:10px;text-align: center;">Budoucí projekce po sobě jdoucích suchých dnů (CDD)</h4>
+    <h4 style="margin:0px 10px 10px 10px;text-align: center;">Celý program i s databází si můžete stáhnout na Githubu: <a href="https://github.com/h8jek1-max/small_useful_programs" >https://github.com/h8jek1-max/small_useful_programs</a></h4>
+	
+<div class="controls">
+        
+    <div style="grid-column: span 1;">
+        
+    <label style="display: inline-flex; align-items: center; cursor: pointer;">
+        <input type="checkbox" id="zobrazit" onchange="prekresliGslMapu()" style="width: auto;" checked>
+         Zobrazit mapovou projekci bezdeští
+    </label>
+        <select id="gsl_vrstva_aktivni" onchange="prekresliGslMapu(); const gpsVstup =  document.getElementById('gps_vstup').value; if(gpsVstup) { const [lat, lon] = gpsVstup.split(',').map(num => parseFloat(num.trim()));nactiCddHistoriiProGraf(lat, lon); }">
+            <option value="ALL">Celoroční maxima</option>
+            <option value="0">Jaro (Březen – Květen)</option>
+            <option value="1">Léto (Červen – Srpen)</option>
+            <option value="2">Podzim (Září – Listopad)</option>
+            <option value="3">Zima (Prosinec – Únor)</option>
+        </select>
+    </div>
+    
+    <div style="grid-column: span 2;">
+        <label>Zeměpisné souřadnice (GPS)</label>
+        <input type="text" id="gps_vstup" value="50.08, 14.43" onchange="" placeholder="Formát:  50.62,15.09">
+    </div>
+    
+    <div style="grid-column: span 3;" id="gsl_casovy_panel" style="display:none;">
+        <!-- ZMĚNA: Úprava textu popisku pro periody sucha -->
+        <label>Zvolené období bezdeští s dvouletým trendem: <span id="gsl_rok_label" style="font-weight:bold; color:#e65100;">2011</span></label>
+        <input type="range" id="gsl_rok_slider" min="2011" max="2098" value="2011" step="1" oninput="posunulSeRokProjekce()">
+    </div>
+
+<!-- Dynamická legenda mapy -->
+<div id="mapa-legenda" class="pudni-panel" style="display:none; font-size:13px;grid-column: span 3;flex-direction: row;">
+    <b id="legenda-titulek">Legenda:</b>
+    <div id="legenda-barvy" style="display:flex; gap:3px; max-width: 410px; margin: 5px auto 0px auto;"></div>
+</div>
+
+</div>
+
+<div class="" id="gsl-graf-sekce" style="margin-top: 5px;">
+    <canvas id="gslGraf" width="1600" height="600" style="cursor: pointer; border: 1px solid #ddd; background: #fff; width: 100%; height: auto; border-radius: 6px; display:none;" onclick="
+    if (this.style.position === 'fixed') {
+        this.style.position = '';
+        this.style.left = '';
+        this.style.top = '';
+        this.style.transform = 'translate(0%, 0%)';
+        this.style.zIndex = '';
+        this.style.boxShadow = '';
+    } else {
+        this.style.position = 'fixed';
+        this.style.left = '50%';
+        this.style.top = '50%';
+        this.style.transform = 'translate(-50%, -50%)';
+        this.style.zIndex = '1000';
+        this.style.boxShadow = '0px 0px 100px';
+    }
+"></canvas>
+    <div class="dominantni-info" id="gsl-meta-info" >
+        Kliknutím do mapy zobrazíte graf budoucího vývoje na daných souřadnicích.
+    </div>
+</div>
+
+    <div class="resizer"></div>
+    
+</div>
+
+<script>
+	
+const panel = document.querySelector('.vegetacni-panel');
+const resizer = document.querySelector('.resizer');
+resizer.addEventListener('mousedown', initResize, false);
+
+function initResize(e) {
+    e.preventDefault();
+    window.addEventListener('mousemove', StartResize, false);
+    window.addEventListener('mouseup', StopResize, false);
+}
+
+function StartResize(e) {
+    // Spočítá novou šířku na základě pravého okraje panelu
+    const panelRight = panel.getBoundingClientRect().right;
+    const newWidth = panelRight - e.clientX;
+    panel.style.width = newWidth + 'px';
+}
+
+function StopResize() {
+    window.removeEventListener('mousemove', StartResize, false);
+    window.removeEventListener('mouseup', StopResize, false);
+}
+
+// =============================================================================
+// GLOBÁLNÍ KONSTANTY A SPRÁVA PAMĚTI (LRU CACHE) - UPRAVENO PRO CDD
+// =============================================================================
+const START_ROK_CDD = 2011;
+const CELKEM_KROKU_CDD = 353; // 89 let x 4 sezóny
+
+class CddMapovaCache {
+    constructor(maxVelikost = 150) {
+        this.maxVelikost = maxVelikost;
+        this.cache = new Map();
+    }
+    ziskej(klic) {
+        if (!this.cache.has(klic)) return null;
+        const data = this.cache.get(klic);
+        this.cache.delete(klic);
+        this.cache.set(klic, data);
+        return data;
+    }
+    uloz(klic, data) {
+        if (this.cache.has(klic)) this.cache.delete(klic);
+        else if (this.cache.size >= this.maxVelikost) {
+            const nejstarsiKlic = this.cache.keys().next().value;
+            this.cache.delete(nejstarsiKlic);
+        }
+        this.cache.set(klic, data);
+    }
+    vymazVse() { this.cache.clear(); }
+}
+
+const gslKlientskaPamet = new CddMapovaCache(150);
+let gslTileLayerLeaflet = null;
+let aktualniMarker = null;
+
+// =============================================================================
+// INICIALIZACE MAPY LEAFLET A MĚŘÍTKA
+// =============================================================================
+const map = L.map('mapa-kontainer').setView([50.62, 15.09], 9);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 22, attribution: '© OpenStreetMap'
+}).addTo(map);
+
+// Přidání metrického měřítka vlevo dolů podle vaší šablony
+L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
+
+// KLÍČOVÉ PROPOJENÍ: Kliknutí do mapy spustí geolokaci a hromadné načtení CDD grafu
+map.on('click', function(e) {
+    const lat = e.latlng.lat.toFixed(4);
+    const lon = e.latlng.lng.toFixed(4);
+    
+    // Aktualizace textového pole pro uživatele
+    const gpsVstup = document.getElementById("gps_vstup");
+    if (gpsVstup) gpsVstup.value = `${lat}, ${lon}`;
+    
+    // Spuštění asynchronního řetězce pro graf bezdeští
+    nactiCddHistoriiProGraf(lat, lon);
+});
+
+// KLÍČOVÉ PROPOJENÍ: Pohnutí časovým jezdcem překreslí mapu z Cache bez dotazu na PHP
+function posunulSeRokProjekce() {
+    const aktivniRok = document.getElementById("gsl_rok_slider").value;
+    document.getElementById("gsl_rok_label").innerText = aktivniRok;
+    if (gslTileLayerLeaflet) {
+        gslTileLayerLeaflet.redraw();
+    }
+}
+
+// =============================================================================
+// GEOLOKACE (Načítání obce z OpenStreetMap - KOREKCE URL PROTI BLOKOVÁNÍ)
+// =============================================================================
+async function nactiGeografickeUdaje(lat, lon) {
+    const panel = document.getElementById("puda-meta"); // Využijeme váš panel pro výpis
+    try {
+        const res = await fetch(`https://openstreetmap.org{lat}&lon=${lon}&addressdetails=1`, {
+            headers: { 'User-Agent': 'AgroCddSimulator/2.0' }
+        });
+        if(!res.ok) throw new Error();
+        const geo = await res.json();
+        if(geo.address) {
+            const a = geo.address;
+            const obec = a.village || a.town || a.city || a.suburb || a.hamlet || "Neznámé místo";
+            const okres = a.county || a.district || "-";
+            const stat = a.country || "-";
+            
+            // Vložíme do vašeho textového popisku před grafem
+            document.getElementById("puda-meta").innerHTML = `📍 <b>Lokalita:</b> ${obec} (Okres: ${okres}, Stát: ${stat})`;
+        }
+    } catch(e) { 
+        console.warn("Geolokace se nezdařila."); 
+    }
+}
+
+// 3. ULTRA-PRECIZNÍ RASTROVÁNÍ MATICE PODLE PŮDNÍCH ROZMĚRŮ (Upraveno pro sezóny CDD)
+function prekresliGslMapu() {
+    const vlastnost = document.getElementById("gsl_vrstva_aktivni").value;
+    const casovyPanel = document.getElementById("gsl_casovy_panel");
+    const legPanel = document.getElementById("mapa-legenda");
+    const legBarvy = document.getElementById("legenda-barvy");
+    const zobraz = document.getElementById("zobrazit").checked;
+
+    if (gslTileLayerLeaflet) { map.removeLayer(gslTileLayerLeaflet); gslTileLayerLeaflet = null; }
+    if (legBarvy) legBarvy.innerHTML = "";
+
+    if (!zobraz) {
+        if (casovyPanel) casovyPanel.style.display = "none";
+        if (legPanel) legPanel.style.display = "none";
+        //gslKlientskaPamet.vymazVse();
+        return;
+    }
+    
+    if (casovyPanel) casovyPanel.style.display = "block";
+    if (legPanel) legPanel.style.display = "block";
+
+    // Vybarvení detailní legendy přizpůsobené pro po sobě jdoucí suché dny
+    const legendySkaly = [
+        { min: 0,  max: 8,   barva: "rgb(13, 71, 161)",  t: "Zanedbatelné sucho <br>(< 8 dní)" },
+        { min: 8,  max: 15,  barva: "rgb(46, 125, 50)",   t: "Mírné sucho <br>(8 - 15)" },
+        { min: 15, max: 25,  barva: "rgb(255, 152, 0)",  t: "Vážné sucho <br>(15 - 25)" },
+        { min: 25, max: 35,  barva: "rgb(233, 100, 23)",  t: "Velmi vážné sucho <br>(25 - 35)" },
+        { min: 35, max: 366, barva: "rgb(211, 47, 47)",  t: "Kritické sucho <br>(> 35 dní)" }
+    ];
+    legendySkaly.forEach(l => {
+        legBarvy.innerHTML += `<div style="text-align: center; margin-right:15px; margin-top:5px; display:inline-block;"><div style="width:20px; height:15px; background:${l.barva}; margin:5px auto; border:1px solid #aaa;"></div><span>${l.t}</span></div>`;
+    });
+
+    document.getElementById("legenda-titulek").innerText = "Legenda: Budoucí rozvoj po sobě jdoucích suchých dnů (CDD)";
+
+    gslTileLayerLeaflet = L.gridLayer({ tileSize: 256, opacity: 0.65 });
+    gslTileLayerLeaflet.createTile = function(coords) {
+        const tile = L.DomUtil.create('canvas', 'leaflet-tile');
+        const ctx = tile.getContext('2d');
+        tile.width = tile.height = this.options.tileSize;
+
+        const klicDlazdice = `${coords.x}_${coords.y}_${coords.z}`;
+        const aktivniRok = parseInt(document.getElementById("gsl_rok_slider").value);
+        const indexRoku = aktivniRok - START_ROK_CDD;
+        const periodaVolba = document.getElementById("gsl_vrstva_aktivni").value;
+        
+        const krok = 16; 
+
+        setTimeout(async () => {
+            let dataDlazdice = gslKlientskaPamet.ziskej(klicDlazdice);
+
+            if (!dataDlazdice) {
+                const poleLat = [], poleLon = [];
+                for (let y = 0; y < 256; y += krok) {
+                    for (let x = 0; x < 256; x += krok) {
+                        const gPoint = map.unproject([coords.x * 256 + x, coords.y * 256 + y], coords.z);
+                        poleLat.push(gPoint.lat.toFixed(4));
+                        poleLon.push(gPoint.lng.toFixed(4));
+                    }
+                }
+                try {
+                    // Volání nového optimalizovaného backendu pro CDD
+                    const res = await fetch(`get_cdd.php?lats=${poleLat.join(',')}&lons=${poleLon.join(',')}`);
+                    if (!res.ok) return;
+                    dataDlazdice = await res.json();
+                    gslKlientskaPamet.uloz(klicDlazdice, dataDlazdice);
+                } catch (e) { return; }
+            }
+
+            for (let y = 0; y < 256; y += krok) {
+                for (let x = 0; x < 256; x += krok) {
+                    const gPoint = map.unproject([coords.x * 256 + x, coords.y * 256 + y], coords.z);
+                    const klicBodu = `${gPoint.lat.toFixed(4)}_${gPoint.lng.toFixed(4)}`;
+                    
+                    if (dataDlazdice && dataDlazdice[klicBodu] && !dataDlazdice[klicBodu].error) {
+                        const historieCdd = dataDlazdice[klicBodu].data;
+                        
+                        // Přepočet indexu roku na 4-krokovou sezónní osu (0=Jaro, 1=Léto, 2=Podzim, 3=Zima)
+                        const startKrokRoku = indexRoku * 4;
+                        let vyhlazeneDny = null;
+
+                        if (periodaVolba === "ALL") {
+                            // Pro celoroční maximum vyhodnocujeme nejdelší sucho ze všech 4 kvartálů
+                            let maxDnyRady = [];
+                            const rozsahOd = Math.max(0, indexRoku * 4);
+                            const rozsahDo = Math.min(historieCdd.length - 1, (indexRoku + 1) * 4);
+                            for (let j = rozsahOd; j < rozsahDo; j++) {
+                                if (historieCdd[j] !== null) maxDnyRady.push(historieCdd[j]);
+                            }
+                            vyhlazeneDny = maxDnyRady.length > 0 ? Math.max(...maxDnyRady) : null;
+                        } else {
+                            // Izolovaná konkrétní sezóna s vaším původním dvouletým vyhlazením trendu
+                            const cistySezonniIndex = startKrokRoku + parseInt(periodaVolba);
+                            let sumCdd = 0, cCdd = 0;
+                            const startOkna = Math.max(0, cistySezonniIndex - 0);
+                            const konecOkna = Math.min(historieCdd.length - 1, cistySezonniIndex + 4); // krok po celých letech (+4 indexy)
+                            
+                            for(let j = startOkna; j <= konecOkna; j += 4) {
+                                if(historieCdd[j] !== null && historieCdd[j] !== undefined) { sumCdd += historieCdd[j]; cCdd++; }
+                            }
+                            vyhlazeneDny = cCdd > 0 ? (sumCdd / cCdd) : historieCdd[cistySezonniIndex];
+                        }
+
+                        if (vyhlazeneDny !== null && vyhlazeneDny !== undefined) {
+                            const match = legendySkaly.find(l => vyhlazeneDny >= l.min && vyhlazeneDny < l.max);
+                            
+                            if (match) {
+                                const barva = match.barva;
+                                const stinRadius = 18;
+                                const centerX = x + krok / 2;
+                                const centerY = y + krok / 2;
+
+                                const gradient = ctx.createRadialGradient(
+                                    centerX, centerY, krok / 2,
+                                    centerX, centerY, stinRadius
+                                );
+                                gradient.addColorStop(0, barva); 
+                                const transparentniBarva = barva.replace("rgb", "rgba").replace(")", ", 0)");
+                                gradient.addColorStop(1, transparentniBarva);
+
+                                ctx.globalCompositeOperation = 'source-over';
+                                ctx.fillStyle = gradient;
+                                ctx.fillRect(x - stinRadius, y - stinRadius, krok + stinRadius * 2, krok + stinRadius * 2);
+                            } else {
+                                ctx.globalCompositeOperation = 'source-over';
+                            }
+                        }
+                    }
+                }
+            }
+        }, 0);
+        return tile;
+    };
+    gslTileLayerLeaflet.addTo(map);
+}
+
+map.on('zoomend', function() {
+    if (document.getElementById("gsl_vrstva_aktivni").value !== "NONE") prekresliGslMapu();
+});
+
+
+
+// 4. PROJEKČNÍ GRAF SE SEZÓNNÍ FILTRACÍ PERIODY BEZDEŠTÍ (CDD do roku 2099)
+async function nactiCddHistoriiProGraf(lat, lon) {
+    const metaGsl = document.getElementById("gsl-meta-info");
+    const canvasGsl = document.getElementById("gslGraf");
+    const periodaVolba = document.getElementById("gsl_vrstva_aktivni").value;
+    
+    metaGsl.innerHTML = "<i>Buduji komplexní 89letý klimatický audit period bezdeští...</i>";
+    if(canvasGsl) canvasGsl.style.display = "none";
+
+    try {
+        // Volání nového optimalizovaného backendu pro CDD
+        const res = await fetch(`get_cdd.php?lats=${lat}&lons=${lon}`);
+        if (!res.ok) throw new Error("Chyba přenosu");
+        const balikDat = await res.json();
+
+        const klicBodu = `${parseFloat(lat).toFixed(4)}_${parseFloat(lon).toFixed(4)}`;
+        if (!balikDat || !balikDat[klicBodu] || balikDat[klicBodu].error) {
+            throw new Error(balikDat[klicBodu]?.error || "Oblast mimo pevninu.");
+        }
+
+        const surovaDataCdd = balikDat[klicBodu].data; // Celá osa 353 kroků
+
+        // --- FILTRACE ČASOVÉ OSY PODLE ZVOLENÉ SEZÓNY ---
+        const cddHistorie = [];
+        const popiskyRokuGrafu = [];
+
+        for (let i = 0; i < surovaDataCdd.length; i++) {
+            const indexRoku = Math.floor(i / 4);
+            const rok = START_ROK_CDD + indexRoku;
+            const mIdx = i % 4; // 0=Jaro, 1=Léto, 2=Podzim, 3=Zima
+
+            if (periodaVolba === "ALL") {
+                // Maximální roční šok – prohledáme 4 kvartály daného roku
+                if (mIdx === 0) {
+                    let maxRoku = 0;
+                    for (let s = 0; s < 4; s++) {
+                        if (surovaDataCdd[i + s] > maxRoku && surovaDataCdd[i + s] !== null) {
+                            maxRoku = surovaDataCdd[i + s];
+                        }
+                    }
+                    cddHistorie.push(maxRoku);
+                    popiskyRokuGrafu.push(rok);
+                }
+            } else {
+                // Izolovaná konkrétní sezóna
+                if (mIdx === parseInt(periodaVolba)) {
+                    cddHistorie.push(surovaDataCdd[i]);
+                    popiskyRokuGrafu.push(rok);
+                }
+            }
+        }
+
+        if(canvasGsl) canvasGsl.style.display = "block";
+
+        const ctx = canvasGsl.getContext("2d");
+        ctx.clearRect(0, 0, canvasGsl.width, canvasGsl.height);
+
+        const padLeft = 100, padRight = 60, padTop = 60, padBottom = 80;
+        const gWidth = canvasGsl.width - padLeft - padRight;
+        const gHeight = canvasGsl.height - padTop - padBottom;
+
+        // Výpočet dynamických limitů osy Y podle zadaných extrémů souřadnice
+        let minVal = 365, maxVal = 0;
+        cddHistorie.forEach(v => { if (v !== null) { if (v < minVal) minVal = v; if (v > maxVal) maxVal = v; } });
+        minVal = Math.max(0, minVal - 5); maxVal = Math.min(365, maxVal + 5);
+        const rozsahY = maxVal - minVal;
+        const krokOsyY = rozsahY / 10;
+
+        const getGslX = (i) => padLeft + (i / (cddHistorie.length - 1)) * gWidth;
+        const getGslY = (val) => padTop + gHeight - ((val - minVal) / rozsahY) * gHeight;
+
+        // Osa Y - 10 orientačních měřítek v přesném stylu vaší šablony
+        ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.font = "14px sans-serif";
+        for (let i = 0; i <= 10; i++) {
+            const aktY = minVal + (i * krokOsyY);
+            ctx.strokeStyle = "rgba(0,0,0,0.35)";
+            ctx.beginPath(); ctx.moveTo(padLeft, getGslY(aktY)); ctx.lineTo(padLeft + gWidth, getGslY(aktY)); ctx.stroke();
+            ctx.fillStyle = "#555"; ctx.fillText(`${Math.round(aktY)} dní`, padLeft - 15, getGslY(aktY));
+        }
+
+        // Osa X - Desetiletí (Dekády) mapovaná na vyfiltrované roky
+        ctx.textAlign = "center"; ctx.textBaseline = "top";
+        for (let i = 0; i < cddHistorie.length; i++) {
+            const rok = popiskyRokuGrafu[i];
+            if (rok % 10 === 0 || i === 0 || i === cddHistorie.length - 1) {
+                ctx.strokeStyle = "rgba(0,0,0,0.35)";
+                ctx.beginPath(); ctx.moveTo(getGslX(i), padTop); ctx.lineTo(getGslX(i), padTop + gHeight); ctx.stroke();
+                ctx.fillStyle = "#000"; ctx.font = "bold 14px sans-serif";
+                ctx.fillText(rok, getGslX(i), padTop + gHeight + 15);
+            }
+        }
+        
+        // ČÁRA A: SUROVÁ MEZIROČNÍ DATA (Zelená linie)
+        ctx.beginPath(); 
+        ctx.strokeStyle = "#2e7d32"; 
+        ctx.lineWidth = 3;        
+        let pBodSurovy = true;
+        for (let i = 0; i < cddHistorie.length; i++) {
+            if (cddHistorie[i] === null) continue;
+            if (pBodSurovy) { 
+                ctx.moveTo(getGslX(i), getGslY(cddHistorie[i])); 
+                pBodSurovy = false; 
+            } else { 
+                ctx.lineTo(getGslX(i), getGslY(cddHistorie[i])); 
+            }
+        }
+        ctx.stroke();
+        // --- HISTORICKÝ KLOUZAVÝ dvacetiletý AGRO-TREND (Oranžová křivka) ---
+        const vyhlazenaRadaGsl = [];
+        for (let i = 0; i < cddHistorie.length; i++) {
+            let sum = 0, c = 0;
+            const s = Math.max(0, i - 5), k = Math.min(cddHistorie.length - 1, i + 5);
+            for(let j = s; j <= k; j++) { if(cddHistorie[j] !== null) { sum += cddHistorie[j]; c++; } }
+            vyhlazenaRadaGsl.push(c > 0 ? sum / c : null);
+        }
+
+        ctx.beginPath(); ctx.strokeStyle = "#e65100"; ctx.lineWidth = 4;
+        let pBod = true;
+        for (let i = 0; i < vyhlazenaRadaGsl.length; i++) {
+            if (vyhlazenaRadaGsl[i] !== null) {
+                if (pBod) { ctx.moveTo(getGslX(i), getGslY(vyhlazenaRadaGsl[i])); pBod = false; }
+                else ctx.lineTo(getGslX(i), getGslY(vyhlazenaRadaGsl[i]));
+            }
+        }
+        ctx.stroke();
+        
+        // Načtení souřadnic z textového pole pro dynamický titulek v Canvasu
+        let latZobraz = lat;
+        let lonZobraz = lon;
+        const gpsVstup = document.getElementById('gps_vstup').value;
+        if(gpsVstup) {
+            const castiGps = gpsVstup.split(',').map(num => parseFloat(num.trim()));
+            if(castiGps.length === 2 && !isNaN(castiGps[0])) {
+                latZobraz = castiGps[0].toFixed(4);
+                lonZobraz = castiGps[1].toFixed(4);
+            }
+        }
+        
+const lokalitaSelect = document.getElementById("gsl_vrstva_aktivni");
+// selectedOptions[0] vybere aktuálně zvolenou položku <option>
+const val = lokalitaSelect.selectedOptions[0].innerHTML;
+    
+        ctx.fillStyle = "#333"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(`${val}`, padLeft, padTop - 45);
+        ctx.fillText("Předpověď po sobě jdoucích suchých dnů (RCP6.0) pro souřadnice lat "+latZobraz+" lon "+lonZobraz+" ", padLeft, padTop - 25);
+        ctx.fillStyle = "#2e7d32"; ctx.fillText("■ Meziroční data", padLeft + 730, padTop - 25);
+        ctx.fillStyle = "#e65100"; ctx.fillText("■ Vyhlazený 10letý klimatický trend", padLeft + 950, padTop - 25);
+        
+        // Výpočet zobrazení textových bilancí pro spodní panel
+        const cddStartTrend = vyhlazenaRadaGsl[0] !== null ? parseInt(vyhlazenaRadaGsl[0]) : 0;
+        const cddKonecTrend = vyhlazenaRadaGsl[vyhlazenaRadaGsl.length - 1] !== null ? parseInt(vyhlazenaRadaGsl[vyhlazenaRadaGsl.length - 1]) : 0;
+
+        metaGsl.innerHTML = ` Kliknutím na graf ho zvětšíte a obráceně.<br>
+    <h4 style="margin:10px;text-align: center;">Projekce maximálního bezdeští do roku 2099 (RCP6.0)</h4>
+     Rok 2011 měl v ${val} <b>${cddHistorie[0]} dní bez deště</b>, v 5letém <b>trendu ${cddStartTrend} dní</b>.
+    <br> V roce 2099 předpověď odhaduje <b>${cddHistorie[cddHistorie.length - 1]} dní</b>, v 5letém <b>trendu ${cddKonecTrend} dní</b>.
+    <br> Rozdíl v počtu dní bez deště mezi těmito roky je <b>${cddHistorie[cddHistorie.length - 1] - cddHistorie[0]}</b>, v 5letém <b>trendu je to ${cddKonecTrend - cddStartTrend} dní</b>. 
+    `;
+
+    } catch (err) {
+        metaGsl.innerHTML = `<span style="color:#d32f2f;">Projekční graf: ${err.message}</span>`;
+    }
+}
+
+// Inicializační spouštěč po úplném načtení DOM stromu webu
+document.addEventListener("DOMContentLoaded", function() {
+    prekresliGslMapu();
+});	
+    
+</script>
+
+</body>
+</html>

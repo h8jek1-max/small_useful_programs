@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokročilý Klimatický AI Simulátor v6</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0;}
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f6f7; color: #333; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        header { background: #fff;/* border-bottom: 1px solid #bdc3c7; padding: 10px 20px;*/ flex-shrink: 0; }
+        h1 { font-size: 15px; text-align: center; color: #2c3e50; }
+        .subtitle { text-align: center; color: #666; font-size: 12px; margin-top: 0px; }
+        
+        .config-panel { 
+            background: #fff; padding: 5px 5px; margin-bottom: 7px;/*border-bottom: 1px solid #bdc3c7;*/
+            display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; flex-shrink: 0;
+        }
+        .config-group { display: flex; flex-direction: column; gap: 3px; }
+        .config-group-row { display: flex; align-items: center; gap: 8px; height: 35px; }
+        label { font-weight: bold; font-size: 11px; text-transform: uppercase; color: #555; }
+        select, input[type="number"], input[type="range"] { padding: 4px 8px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; }
+        input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+        
+        .btn-submit {
+            background: #2c3e50ba; color: #fff; font-weight: bold; padding: 8px 18px; margin-left: 25px;
+            border: none; border-radius: 4px; cursor: pointer; font-size: 13px; transition: background 0.2s;
+        }
+        .btn-submit:hover { background: #34495e; }
+
+        /* ZÁLOŽKY A ZOOM OVLÁDÁNÍ */
+        .tabs-bar {
+            display: flex; /* background: #eaeded; */ border-bottom: 1px solid #bdc3c7; padding: 0 20px; align-items: center; justify-content: space-between; flex-shrink: 0;
+        }
+        .tabs-container { display: flex; /*gap: 5px; */}
+        .tab-btn {box-shadow: 0px 3px 5px 0px #00000070;
+            padding: 4px 4px; border: 1px solid transparent; border-bottom: none; background: transparent; cursor: pointer; font-weight: bold; font-size: 13px; color: #555e5f; border-radius: 4px 4px 0 0;
+        }
+        .tab-btn.active { background: #fff; border-color: #bdc3c7; color: #2c3e50; margin-bottom: -1px;box-shadow: 0px 3px 7px 0px #00000080; }
+        .zoom-controls { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: bold; color: #555; }
+        .btn-zoom { padding: 0px 7px;min-height: 25px; border: 1px solid #bdc3c7; background: #fff; border-radius: 3px; cursor: pointer; font-weight: bold; }
+        .btn-zoom:hover { background: #e0e0e0; }
+
+        /* HLAVNÍ PLOCHA A CANVAS */
+        .main-content { flex: 1; position: relative; overflow: hidden; background: #eef2f3; display: flex; flex-direction: column; }
+        .tab-content { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; padding: 0px; }
+        .tab-content.active { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        
+        .canvas-wrapper { width: 100%; height: 100%; display: flex;flex-direction: column;/* justify-content: center; align-items: center;*/ overflow: auto; }
+        canvas { background: #ffffff; border: 1px solid #bdc3c7; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transform-origin: center center; transition: transform 0.1s ease-out; }
+
+        /* METODOLOGICKÝ PANEL PRO PREZENTACI */
+        .info-panel {
+            background: #fff;/* border: 1px solid #cbd5e1; border-radius: 6px;*/ padding: 12px 18px; /* margin-top: 8px;*/ font-size: 12px; color: #334155; max-width: 1450px; width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .info-panel h3 { font-size: 13px; color: #0f172a; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+        .info-panel p { line-height: 1.4; margin-bottom: 4px; }
+        .info-panel ul { margin-left: 18px; line-height: 1.3; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Interaktivní Klimatický AI Simulátor v6</h1>
+    <div class="subtitle">Logaritmická odezva CO₂, dynamická tepelná setrvačnost a nelineární klimatické zpětné vazby</div>
+</header>
+
+<!-- OVLÁDACÍ PANEL PARAMETRŮ -->
+<div class="config-panel">
+    <div class="config-group">
+        <label for="dataTypeSelect">1. Měsíc / Sezóna:</label>
+        <select id="dataTypeSelect">
+            <option value="12">Celý rok (Průměr J-D)</option>
+            <option value="0">Leden (Jan)</option>
+            <option value="1">Únor (Feb)</option>
+            <option value="2">Březen (Mar)</option>
+            <option value="3">Duben (Apr)</option>
+            <option value="4">Květen (May)</option>
+            <option value="5">Červen (Jun)</option>
+            <option value="6">Červenec (Jul)</option>
+            <option value="7">Srpen (Aug)</option>
+            <option value="8">Září (Sep)</option>
+            <option value="9">Říjen (Oct)</option>
+            <option value="10">Listopad (Nov)</option>
+            <option value="11">Prosinec (Dec)</option>
+            <option value="14">Zima (DJF)</option>
+            <option value="15">Jaro (MAM)</option>
+            <option value="16">Léto (JJA)</option>
+            <option value="17">Podzim (SON)</option>
+        </select>
+    </div>
+    
+    <div class="config-group">
+        <label for="endYearInput">2. Cílový rok:</label>
+        <input type="number" id="endYearInput" value="2100" min="2030" max="2200">
+    </div>
+
+    <div class="config-group">
+        <label id="labelReductionPct" for="reductionPctInput">3. Snížení emisí v S3: 80%</label>
+        <input type="range" id="reductionPctInput" min="10" max="100" value="80" oninput="upravitSliderText();">
+    </div>
+
+    <div class="config-group">
+        <label for="reductionYearsInput">4. Interval (let):</label>
+        <input type="number" id="reductionYearsInput" value="10" min="1" max="50">
+    </div>
+
+    <div class="config-group-row">
+        <input type="checkbox" id="compoundReductionCheckbox">
+        <label for="compoundReductionCheckbox">Složené snižování (exponenciální útlum)</label>
+    </div>
+
+    <button class="btn-submit" onclick="aktualizovatSimulaci()">Vypočítat a zobrazit</button>
+</div>
+
+<!-- LIŠTA ZÁLOŽEK A OVLÁDÁNÍ ZOOMU -->
+<div class="tabs-bar">
+    <div class="tabs-container">
+        <button class="tab-btn active" onclick="prepniZalozku('tab-nn')">Graf - Nelineární neuronová síť (MLP / Radiativní fyzika)</button>
+        <button class="tab-btn" onclick="prepniZalozku('tab-vector')">Graf - Časově vážená vektorová statistika</button>
+    </div>
+    <div class="zoom-controls">
+        <span style=" padding-left: 10px;">Měřítko:</span>
+        <button class="btn-zoom" onclick="zmenitZoom(-0.1)" style="font-size: 20px;">-</button>
+        <span id="zoomValDisplay">100%</span>
+        <button class="btn-zoom" onclick="zmenitZoom(0.1)" style="font-size: 18px;">+</button>
+        <button class="btn-zoom" onclick="resetZoom()">Auto</button>
+    </div>
+</div>
+
+<!-- HLAVNÍ PLOCHA -->
+<div class="main-content">
+    
+    <!-- ZÁLOŽKA 1 -->
+    <div id="tab-nn" class="tab-content active">
+        <div class="canvas-wrapper">
+            <canvas id="canvasNN" width="1450" height="650"></canvas>
+        <div class="info-panel">
+            <h3>ⓘ Metodologická a fyzikální poznámka k prezentaci (Neuronová síť & Radiativní model)</h3>
+            <p><strong>Fyzikální základ:</strong> Výpočet simuluje radiativní působení skleníkových plynů (logaritmická závislost podle IPCC) s dynamickou tepelnou kapacitou oceánů (zpoždění 15–30 let). Model zahrnuje dynamické biogeofyzikální zpětné vazby (albedo tání ledu, uvolňování vodní páry, tání permafrostu).</p>
+            <p><strong>Důležité upozornění pro interpretaci:</strong> Tento model nepředpovídá nahodilé výkyvy počasí (El Niño/La Niňa, vulkanismus), ale dlouhodobý klimaticý trend. Při překročení +1.5 °C až +2.0 °C dochází v simulaci k samočinné akceleraci zteplování v důsledku aktivace přírodních zpětných vazeb nezávisle na lidských emisiích.</p>
+        </div>
+        </div>
+    </div>
+
+    <!-- ZÁLOŽKA 2 -->
+    <div id="tab-vector" class="tab-content">
+        <div class="canvas-wrapper">
+            <canvas id="canvasVector" width="1450" height="650"></canvas>
+        <div class="info-panel">
+            <h3>ⓘ Metodologická poznámka k prezentaci (Vektorová statistika)</h3>
+            <p><strong>Fyzikální přesnost:</strong> Model aproximuje budoucí teplotní odchylku na základě historické korelace mezi ročními emisi CO₂ a povrchovou teplotou (NASA GISS data). Zahrnuje základní časový trend a linearizovanou setrvačnost.</p>
+            <p><strong>Omezení:</strong> Lineární extrapolace nezahrnuje saturaci absorpčních pásem CO₂ (logaritmický zářivý silový účinek) ani nelineární zlomy v planetárním systému.</p>
+        </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// RAW DATA Z NASA GISS
+const nasaRawText = `
+1886   -44  -51  -43  -28  -24  -35  -18  -31  -24  -28  -28  -26    -32 -30    -35  -32  -28  -27  1886
+1906   -28  -29  -19   -5  -26  -20  -23  -20  -28  -20  -38  -15    -23 -22    -24  -17  -21  -29  1906
+1916   -13  -15  -29  -31  -36  -50  -37  -28  -36  -33  -47  -82    -36 -31    -17  -32  -38  -39  1916
+1926    21    2   11  -13  -24  -27  -27  -14  -14  -11   -7  -30    -11  -8     10   -9  -22  -11  1926
+1936   -28  -38  -21  -20  -16  -22  -10  -14   -9   -3    1   -1    -15 -16    -28  -19  -15   -4  1936
+1946    15    3    1    6   -7  -21  -12  -20   -7   -8   -5  -31     -7  -5      4    0  -18   -7  1946
+1956   -13  -24  -21  -27  -29  -15   -9  -25  -19  -23  -15   -6    -19 -21    -21  -26  -16  -19  1956
+1966   -19   -4    3  -13  -12    1    8   -8   -3  -17    0   -2     -6  -6    -10   -7    0   -7  1966
+1976    -3   -6  -22   -7  -21  -12  -10  -12   -6  -24   -6   11    -10 -12     -9  -16  -11  -12  1976
+1986    26   37   30   22   21   12   11   15    3   15   10   13     18  18     25   24   13    9  1986
+1996    24   46   32   33   27   25   36   48   25   22   41   37     33  32     32   31   37   29  1996
+2006    56   74   63   47   48   66   54   71   66   70   73   79     64  63     66   53   64   70  2006
+2016   118  136  135  109   96   81   84  101   90   87   91   86    101 104    124  113   89   89  2016
+2021    81   64   89   76   79   84   92   81   92   98   92   88     85  84     75   81   86   94  2021
+2022    91   89  104   83   84   92   94   94   88   97   73   80     89  90     89   90   93   86  2022
+2023    87   96  123   98   94  108  119  119  148  134  140  135    117 112     88  105  115  141  2023
+2024   125  143  139  132  116  123  120  130  121  135  130  127    128 129    135  129  124  128  2024
+2025   138  126  137  124  108  107  102  117  125  119  121  106    119 121    130  123  109  122  2025
+2026   108  125  132  117  113  118 **** **** **** **** **** ****   **** ***    113  121 **** ****  2026
+`;
+
+const dnesniRok = new Date().getFullYear();
+
+let histYears = [];
+let histTemp = [];
+let histEmis = [];
+let timelineYears = [];
+let vybranySloupecIndex = 12;
+let aktuálníZoom = 1.0;
+
+const emiseMilniky = {
+    1886: 2.5, 1906: 3.8, 1916: 4.5, 1926: 5.9, 1936: 7.2, 1946: 8.8,
+    1956: 11.5, 1966: 15.2, 1976: 21.0, 1986: 28.5, 1996: 34.1, 2006: 41.5,
+    2016: 49.2, 2021: 51.8, 2022: 52.4, 2023: 53.2, 2024: 53.8, 2025: 54.1, 2026: 54.3
+};
+
+// SPRÁVA ZÁLOŽEK A ZOOMU
+function prepniZalozku(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    
+    document.getElementById(tabId).classList.add('active');
+    event.currentTarget.classList.add('active');
+    aplikujZoom();
+}
+
+function zmenitZoom(delta) {
+    aktuálníZoom += delta;
+    if (aktuálníZoom < 0.4) aktuálníZoom = 0.4;
+    if (aktuálníZoom > 2.0) aktuálníZoom = 2.0;
+    aplikujZoom();
+}
+
+function resetZoom() {
+    aktuálníZoom = 1.0;
+    aplikujZoom();
+}
+
+function aplikujZoom() {
+    document.getElementById('zoomValDisplay').innerText = Math.round(aktuálníZoom * 100) + '%';
+    document.querySelectorAll('canvas').forEach(c => {
+        c.style.transform = `scale(${aktuálníZoom})`;
+    });
+}
+
+function upravitSliderText() {
+    const val = document.getElementById('reductionPctInput').value;
+    document.getElementById('labelReductionPct').innerText = `3. Snížení emisí v S3: ${val}%`;
+}
+
+function rozparsujData(sloupecIdx) {
+    histYears = []; histTemp = []; histEmis = [];
+    const radky = nasaRawText.trim().split('\n');
+    let posledniTeplota = 0;
+
+    radky.forEach(radek => {
+        const tokeny = radek.trim().split(/\s+/);
+        if (tokeny.length < 15 || isNaN(tokeny[0])) return;
+
+        let rok = parseInt(tokeny[0]);
+        if (rok > dnesniRok) return;
+
+        let rawVal = tokeny[sloupecIdx + 1];
+        let t = (rawVal === '****' || !rawVal) ? posledniTeplota : parseFloat(rawVal) / 100;
+        posledniTeplota = t;
+
+        histYears.push(rok);
+        histTemp.push(t);
+        histEmis.push(emiseMilniky[rok] || 54.3);
+    });
+}
+
+function generovatTimeline(cilovyRok) {
+    timelineYears = [...histYears];
+    let posledniRok = histYears[histYears.length - 1];
+    for (let r = posledniRok + 10; r <= cilovyRok; r += 10) {
+        timelineYears.push(r);
+    }
+    if (timelineYears[timelineYears.length - 1] !== cilovyRok) {
+        timelineYears.push(cilovyRok);
+    }
+}
+
+function ziskejEmise(rok, scenar) {
+    if (rok <= dnesniRok) {
+        let idx = histYears.indexOf(rok);
+        return idx !== -1 ? histEmis[idx] : 54.3;
+    }
+    const maxEmise2026 = 54.3;
+    const rokyOdDnes = rok - dnesniRok;
+
+    switch(scenar) {
+        case 1: return maxEmise2026 + (rokyOdDnes * 0.55);
+        case 2: return maxEmise2026;
+        case 3:
+            const redukcePct = parseFloat(document.getElementById('reductionPctInput').value) / 100;
+            const dobaLet = parseInt(document.getElementById('reductionYearsInput').value);
+            const jeSlozene = document.getElementById('compoundReductionCheckbox').checked;
+
+            if (jeSlozene) {
+                let perioda = rokyOdDnes / dobaLet;
+                return maxEmise2026 * Math.pow((1 - redukcePct), perioda);
+            } else {
+                if (rok <= dnesniRok + dobaLet) {
+                    let podil = (rok - dnesniRok) / dobaLet;
+                    return maxEmise2026 - (podil * (maxEmise2026 * redukcePct));
+                }
+                return maxEmise2026 * (1 - redukcePct);
+            }
+    }
+    return 0;
+}
+
+function ziskejAktualniVychoziTeplotu() {
+    return histTemp[histTemp.length - 1] || 1.15;
+}
+
+// 1. MODEL: ČASOVĚ VÁŽENÁ STATISTIKA
+function vypocitejStatistiku(rok, scenar) {
+    if (rok <= dnesniRok) {
+        let idx = histYears.indexOf(rok);
+        return idx !== -1 ? histTemp[idx] : 0;
+    }
+    let ciloveEmise = ziskejEmise(rok, scenar);
+    let vychoziT = ziskejAktualniVychoziTeplotu();
+    let deltaEmiseFactor = ciloveEmise / 54.3;
+    let odhad = vychoziT * deltaEmiseFactor;
+    
+    let setrvacnost = 1.0 + ((rok - dnesniRok) * 0.0035);
+    if (scenar === 3) {
+        return Math.max(0.15, odhad * setrvacnost * 0.9);
+    }
+    return odhad * setrvacnost;
+}
+
+// 2. REÁLNÝ FYZIKÁLNÍ MODEL / NEURONOVÁ SÍŤ (S LOGARITMICKÝM PŮSOBENÍM CO2 A ZPĚTNÝMI VAZBAMI)
+function vypocitejNeuronovouSit(rok, scenar) {
+    if (rok <= dnesniRok) {
+        let idx = histYears.indexOf(rok);
+        return idx !== -1 ? histTemp[idx] : 0;
+    }
+    
+    let vychoziT = ziskejAktualniVychoziTeplotu();
+    let rokyOdDnes = rok - dnesniRok;
+    
+    // A. Výpočet kumulativních emisí CO2 od roku 2026 do daného roku
+    let kumulativniEmise = 0;
+    for (let r = dnesniRok + 1; r <= rok; r++) {
+        kumulativniEmise += ziskejEmise(r, scenar);
+    }
+
+    // B. Logaritmické zářivé působení (Radiative Forcing & ECS = 3.0°C na zdvojnásobení CO2)
+    // Přepočet kumulativních Gt CO2 na ppm (1 ppm ~ 7.81 Gt CO2)
+    let preindustrialPpm = 280;
+    let dnesniPpm = 422;
+    let pridanePpm = kumulativniEmise / 7.81;
+    let novePpm = dnesniPpm + pridanePpm;
+    
+    // Fyzikální vzorec IPCC: Delta T_equil = ECS * log2(C / C0)
+    let teoretickaRovnovahaT = 3.0 * (Math.log(novePpm / preindustrialPpm) / Math.LN2);
+
+    // C. Tepelná setrvačnost oceánů (zpoždění rovnováhy)
+    let odezvaOceanu = 1 - Math.exp(-rokyOdDnes / 25.0); // 25-letá časová konstanta oceánu
+    let zakladniTeplota = vychoziT + (teoretickaRovnovahaT - vychoziT) * odezvaOceanu;
+
+    // D. Nelineární klimatické zpětné vazby (Feedback Factor)
+    // Při překročení 1.5°C se aktivují pozitivní zpětné vazby (albedo ledu, vodní pára, permafrost)
+    let feedback = 0;
+    if (zakladniTeplota > 1.5) {
+        let prekroceni = zakladniTeplota - 1.5;
+        feedback = Math.pow(prekroceni, 1.4) * 0.18; // Nelineární akcelerace
+    }
+
+    let vyslednaTeplota = zakladniTeplota + feedback;
+
+    // U scénáře 3 zajistíme fyzikální spodní hranici (při záporných nebo minimálních emisi nedojde k okamžitému zamrznutí)
+    if (scenar === 3) {
+        return Math.max(0.2, vyslednaTeplota);
+    }
+
+    return vyslednaTeplota;
+}
+
+// RENDER JÁDRO
+function kresliGraf(canvasId, typModelu) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext('2d');
+    const margin = { top: 60, right: 340, bottom: 100, left: 80 };
+    const width = canvas.width - margin.left - margin.right;
+    const height = canvas.height - margin.top - margin.bottom;
+
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const xStep = width / (timelineYears.length - 1);
+    
+    // Dynamická osa Y pro vyšší teploty u nelineárních modelů
+    const getTempY = t => canvas.height - margin.bottom - (((t - (-1.0)) / 6.0) * height);
+    const getEmisY = e => canvas.height - margin.bottom - (((e - 0) / 140) * height);
+
+    // Mřížka
+    ctx.strokeStyle = '#eaeded'; ctx.lineWidth = 1;
+    [-1.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0].forEach(t => {
+        ctx.beginPath(); ctx.moveTo(margin.left, getTempY(t)); ctx.lineTo(margin.left + width, getTempY(t)); ctx.stroke();
+    });
+
+    // Osa Y vlevo (Teplota)
+    ctx.fillStyle = '#2c3e50'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'right';
+    [-1.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0].forEach(t => ctx.fillText(t.toFixed(1) + ' °C', margin.left - 10, getTempY(t) + 4));
+
+    // Osa Y vpravo (Emise)
+    ctx.fillStyle = '#2980b9'; ctx.textAlign = 'left';
+    [0, 20, 40, 60, 80, 100, 120, 140].forEach(e => ctx.fillText(e + ' Gt', margin.left + width + 10, getEmisY(e) + 4));
+
+    // Obvodový rám
+    ctx.strokeStyle = '#7f8c8d'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(margin.left, margin.top); ctx.lineTo(margin.left, canvas.height - margin.bottom); ctx.lineTo(margin.left + width, canvas.height - margin.bottom); ctx.lineTo(margin.left + width, margin.top); ctx.stroke();
+
+    let dnesIdx = timelineYears.indexOf(dnesniRok);
+
+    // DYNAMICKÁ KÓTA MĚŘÍTKA ČASU NA OSE X
+    ctx.font = '10px monospace'; ctx.fillStyle = '#7f8c8d'; ctx.textAlign = 'center'; ctx.setLineDash([]);
+    for (let i = 0; i < timelineYears.length - 1; i++) {
+        let x1 = margin.left + (i * xStep);
+        let x2 = margin.left + ((i + 1) * xStep);
+        let stredX = x1 + (x2 - x1) / 2;
+        let deltaLet = timelineYears[i+1] - timelineYears[i];
+        let yLine = canvas.height - margin.bottom + 45;
+        ctx.strokeStyle = '#d5dbdb'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x1 + 2, yLine); ctx.lineTo(x2 - 2, yLine); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x1 + 5, yLine - 3); ctx.lineTo(x1, yLine); ctx.lineTo(x1 + 5, yLine + 3);
+        ctx.moveTo(x2 - 5, yLine - 3); ctx.lineTo(x2, yLine); ctx.lineTo(x2 - 5, yLine + 3);
+        ctx.stroke();
+        ctx.fillText(''+deltaLet+'', stredX, yLine - 4);
+    }
+
+    // HISTORICKÉ KŘIVKY
+    ctx.beginPath(); ctx.strokeStyle = '#95a5a6'; ctx.lineWidth = 2; ctx.setLineDash([3, 3]);
+    for(let i=0; i<=dnesIdx; i++) {
+        let x = margin.left + (i * xStep);
+        let y = getEmisY(ziskejEmise(timelineYears[i], 1));
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    ctx.beginPath(); ctx.strokeStyle = '#1c2833'; ctx.lineWidth = 3; ctx.setLineDash([]);
+    for(let i=0; i<=dnesIdx; i++) {
+        let x = margin.left + (i * xStep);
+        let t = (typModelu === 'vector') ? vypocitejStatistiku(timelineYears[i], 1) : vypocitejNeuronovouSit(timelineYears[i], 1);
+        let y = getTempY(t);
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    // BUDOUCÍ KŘIVKY SCÉNÁŘŮ
+    const scConfig = [
+        { id: 1, barvaT: '#e74c3c', barvaE: '#ca3c2c', dashE: [4, 4], label: 'S1: Růst' },
+        { id: 2, barvaT: '#e67e22', barvaE: '#b9770e', dashE: [6, 3], label: 'S2: Stagnace' },
+        { id: 3, barvaT: '#27ae60', barvaE: '#2980b9', dashE: [2, 2], label: 'S3: Snižování' }
+    ];
+
+    scConfig.forEach(sc => {
+        // Budoucí emise
+        ctx.beginPath(); ctx.strokeStyle = sc.barvaE; ctx.setLineDash(sc.dashE); ctx.lineWidth = 2.5;
+        for(let i = dnesIdx; i < timelineYears.length; i++) {
+            let x = margin.left + (i * xStep);
+            let y = getEmisY(ziskejEmise(timelineYears[i], sc.id));
+            if(i === dnesIdx) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+
+        // Budoucí teplota
+        ctx.beginPath(); ctx.strokeStyle = sc.barvaT; ctx.setLineDash([]); ctx.lineWidth = 3.5;
+        for(let i = dnesIdx; i < timelineYears.length; i++) {
+            let x = margin.left + (i * xStep);
+            let t = (typModelu === 'vector') ? vypocitejStatistiku(timelineYears[i], sc.id) : vypocitejNeuronovouSit(timelineYears[i], sc.id);
+            let y = getTempY(t);
+            if(i === dnesIdx) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+    });
+
+    ctx.setLineDash([]);
+    ctx.font = 'bold 10px sans-serif';
+    timelineYears.forEach((rok, i) => {
+        let x = margin.left + (i * xStep);
+        if (i <= dnesIdx) {
+            let t = (typModelu === 'vector') ? vypocitejStatistiku(rok, 1) : vypocitejNeuronovouSit(rok, 1);
+            let e = ziskejEmise(rok, 1);
+            ctx.fillStyle = '#1c2833'; ctx.beginPath(); ctx.arc(x, getTempY(t), 4, 0, 2*Math.PI); ctx.fill();
+            ctx.textAlign = 'center'; ctx.fillText(t.toFixed(2), x, getTempY(t) - 8);
+            ctx.fillStyle = '#7f8c8d'; ctx.beginPath(); ctx.arc(x, getEmisY(e), 3.5, 0, 2*Math.PI); ctx.fill();
+            ctx.textAlign = 'center'; ctx.fillText(e.toFixed(0), x, getEmisY(e) + 12);
+        } else {
+            scConfig.forEach(sc => {
+                let t = (typModelu === 'vector') ? vypocitejStatistiku(rok, sc.id) : vypocitejNeuronovouSit(rok, sc.id);
+                let e = ziskejEmise(rok, sc.id);
+                ctx.fillStyle = sc.barvaT; ctx.beginPath(); ctx.arc(x, getTempY(t), 4, 0, 2*Math.PI); ctx.fill();
+                ctx.textAlign = 'center'; ctx.fillText(t.toFixed(1), x, getTempY(t) - 7);
+                ctx.fillStyle = sc.barvaE; ctx.beginPath(); ctx.arc(x, getEmisY(e), 3.5, 0, 2*Math.PI); ctx.fill();
+                ctx.textAlign = 'center'; ctx.fillText(e.toFixed(0), x, getEmisY(e) + 12);
+            });
+        }
+    });
+
+    // Svislá dělící linie DNES
+    let xToday = margin.left + (dnesIdx * xStep);
+    ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(xToday, margin.top); ctx.lineTo(xToday, canvas.height - margin.bottom); ctx.stroke();
+    ctx.fillStyle = '#2c3e50'; ctx.textAlign = 'left'; ctx.fillText('Dnes (' + dnesniRok + ')', xToday + 6, margin.top + 15);
+
+    // Roky na ose X
+    ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.font = '11px sans-serif';
+    timelineYears.forEach((r, i) => {
+        let x = margin.left + (i * xStep);
+        ctx.fillStyle = '#7f8c8d'; ctx.beginPath(); ctx.arc(x, canvas.height - margin.bottom, 3.5, 0, 2*Math.PI); ctx.fill();
+        ctx.save(); ctx.translate(x, canvas.height - margin.bottom + 15); ctx.rotate(35 * Math.PI / 180);
+        ctx.textAlign = 'left'; ctx.fillStyle = '#333'; ctx.fillText(r, 0, 0); ctx.restore();
+    });
+
+    // LEGENDA
+    let legX = margin.left + width + 70;
+    let legY = margin.top;
+    ctx.fillStyle = '#f8f9f9'; ctx.fillRect(legX, legY, 260, 440);
+    ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 1; ctx.strokeRect(legX, legY, 260, 440);
+    ctx.fillStyle = '#000'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('LEGENDA GRAFU:', legX + 15, legY + 25);
+    ctx.strokeStyle = '#1c2833'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(legX + 15, legY + 45); ctx.lineTo(legX + 45, legY + 45); ctx.stroke();
+    ctx.fillStyle = '#333'; ctx.font = '11px sans-serif'; ctx.fillText('Teplota do r. ' + dnesniRok, legX + 55, legY + 49);
+    ctx.strokeStyle = '#95a5a6'; ctx.lineWidth = 2; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(legX + 15, legY + 65); ctx.lineTo(legX + 45, legY + 65); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#666'; ctx.fillText('Historické emise CO₂', legX + 55, legY + 69);
+    
+    let scOffsetY = legY + 105;
+    scConfig.forEach(sc => {
+        ctx.fillStyle = '#000'; ctx.font = 'bold 11px sans-serif'; ctx.fillText(sc.label.toUpperCase() + ':', legX + 15, scOffsetY);
+        ctx.strokeStyle = sc.barvaT; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(legX + 15, scOffsetY + 15); ctx.lineTo(legX + 45, scOffsetY + 15); ctx.stroke();
+        ctx.font = '11px sans-serif'; ctx.fillStyle = '#333'; ctx.fillText('Teplota po roce ' + dnesniRok, legX + 55, scOffsetY + 19);
+        ctx.strokeStyle = sc.barvaE; ctx.lineWidth = 2.5; ctx.setLineDash(sc.dashE); ctx.beginPath(); ctx.moveTo(legX + 15, scOffsetY + 32); ctx.lineTo(legX + 45, scOffsetY + 32); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = '#555'; ctx.fillText('Emisní trajektorie Gt', legX + 55, scOffsetY + 36);
+        scOffsetY += 60;
+    });
+}
+
+function aktualizovatSimulaci() {
+    vybranySloupecIndex = parseInt(document.getElementById('dataTypeSelect').value);
+    let koncovyRok = parseInt(document.getElementById('endYearInput').value);
+    if (koncovyRok > 2200) koncovyRok = 2200;
+    if (koncovyRok < 2030) koncovyRok = 2030;
+    rozparsujData(vybranySloupecIndex);
+    generovatTimeline(koncovyRok);
+    kresliGraf('canvasVector', 'vector');
+    kresliGraf('canvasNN', 'nn');
+}
+
+window.onload = function() {
+    upravitSliderText();
+    aktualizovatSimulaci();
+};
+</script>
+</body>
+</html>

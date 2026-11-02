@@ -1,0 +1,2655 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Biologicky efektivní suma teplot a srážky</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="leaflet.min.css">
+    <script src="leaflet.min.js"></script>
+
+<style>
+    body { margin: 0; padding: 0; font-family: sans-serif; display: flex; height: 100vh; box-sizing: border-box;
+      justify-content: center;
+      align-items: center; }
+    #mapa-kontainer {  flex-grow: 1; height: 100%; margin: 0px; }
+    .vegetacni-panel {
+        position: relative; /* Nutné pro správné umístění táhla */
+        height: 100%; 
+        display: none; 
+        flex-direction: column; 
+        gap: 0px; 
+        width: 45%;       /* Výchozí šířka panelu při načtení */
+        min-width: 20%;   /* Minimální šířka */
+        max-width: 90%;   /* maximální šířka */
+        margin: 0px; 
+        background: #fff; 
+        padding: 0px 5px 0px 10px;
+        overflow-y: auto;  
+        opacity: 1;
+        transition: width 0.2s;
+    }
+    .resizer {
+        width: 8px;
+        height: 100%;
+        position: relative;
+        background: #ddd;
+        top: 0px;
+        left: 0px;
+        cursor: col-resize; /* Změní kurzor na šipky vlevo/vpravo */
+        user-select: none;  /* Zabrání označování textu při tažení */
+    }
+    .resizer:hover { background: #d6d6d6; }
+    .resizer2 {
+        width: 17px;
+        height: 30px;
+        position: absolute;
+        background: #ddd;
+        left: 0px;
+        top: 50%;
+        transform: translate(0%, -50%);
+        z-index: 1000;
+        border-radius: 0px 4px 4px 0px;
+    }
+    .resizer3 {
+        width: 100%;
+        height: 30px;
+        position: absolute;
+        background: #cecdcd;
+        right: 0px;
+        cursor: pointer;
+        user-select: none;
+        border-radius: 2px 6px 6px 2px;
+        opacity: 0.25;
+        border: 0px solid rgba(255, 255, 255, 0);
+        box-shadow: -1px -1px 3px #fafafa7a , 1px 1px 3px #0606067a , inset 7px 7px 12px #fafafa17 , inset -3px -7px 9px #06060621 , inset 7px 13px 13px #fafafa14 , inset -1px -1px 1px #06060652, inset 1px 1px 1px #fafafa4a;
+        transition: box-shadow 0.1s, background 0.1s;
+    }
+    .resizer3:hover { 
+        background: #42414140;
+        box-shadow: -2px -2px 9px #06060600 , 2px 2px 9px #fff0 , inset 7px 7px 12px #0000001a, inset -3px -7px 9px #ffffff12 , inset -7px -13px 13px #ffffff08 , inset -1px -1px 1px #ffffffc7, inset 1px 1px 1px #0606065c;
+        transition: box-shadow 0.1s, background 0.1s;
+    }
+    table.pudni-tabulka { width: 100%; border-collapse: collapse; margin-top: 0px; font-size: 12px; }
+    table.pudni-tabulka th, table.pudni-tabulka td { border: 1px solid #ddd; padding: 3px; text-align: center; }
+    table.pudni-tabulka th { background: #e4f0d6; color: #335e23; }
+    .dominantni-info { color: #3d3d3d; margin-bottom: 15px; font-size: 14px; }
+    .controls { margin-bottom: 0px; padding: 5px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; padding-bottom: 0px; }
+    label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #444; }
+    input, select, button { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    button { background: #2e7d32; color: white; border: none; cursor: pointer; font-weight: bold; padding: 8px; margin-top: 15px; }
+    button:hover { background: #1b5e20; }
+</style>
+
+    <style>
+        :root {
+            --slider-height: 8px;
+            --handle-size: 22px;
+            --color-bg: #e2e8f0;
+            --color-track: #3b82f6;
+            --color-handle: #1e40af;
+            --color-tick: #cbd5e1;
+            --color-tick: #b7c3cf;
+            
+            --color-text-muted: #94a3b8;
+            --color-text-muted: #687b97;
+            --color-text-active: #0f172a;
+            --color-tick-active: #3b82f6;
+        }
+        
+        /* Sekce pro každý jednotlivý slider */
+        .slider-section {
+  width: 100%;
+  max-width: 500px;
+  grid-column: span 3;
+  margin: auto;
+        }
+
+        .slider-section h2 {
+            margin-top: 0;
+            color: #444;
+            font-size: 11px;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 0px;
+            margin-bottom: 0px; /* Dostatek místa pro vícepatrové kaskády popisků */
+        }
+
+.slider-container {
+	position: relative;
+	width: 75%;
+	margin: 0px 15px 15px 15px;
+}
+
+.sliderc {
+	display: flex;
+	width: 100%;
+	min-width: 250px;
+	max-width: 500px;
+	gap: 0px;
+	margin-top: 0px;
+	align-items: center;
+	align-content: center;
+	flex-wrap: wrap;
+}
+
+        .slider-scale-wrapper {
+            position: relative;
+            width: 100%;
+            height: 3px;
+            margin-bottom: 12px;
+        }
+
+        .sliderwrapper {
+            position: relative;
+            width: 100%;
+            height: 40px;
+            margin-bottom: 12px;
+        }
+
+        .scale-point {
+            position: absolute;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+        }
+
+        .scale-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--color-text-muted);
+            white-space: nowrap;
+            position: absolute;
+            bottom: 16px; 
+            transform-origin: bottom center;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Statické popisky plynule mizí */
+        .scale-point:not(.is-active) .scale-label {
+            transition: opacity 0.2s ease;
+        }
+
+        /* Aktivní popisky jezdců – bez blikání opacity, animuje se pouze výška */
+        .scale-point.is-active .scale-label {
+            color: var(--color-text-active);
+            font-weight: 800;
+            background: white;
+            /*transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), color 0.2s ease;*/
+        }
+
+        .scale-tick {
+            width: 2px;
+            height: 10px;
+            background-color: var(--color-tick);
+            position: absolute;
+            bottom: 0;
+            transition: background-color 0.2s ease, height 0.2s ease;
+        }
+        
+        .mes {
+            width: 3px;
+            height: 18px;
+            background-color: var(--color-tick);
+            position: absolute;
+            bottom: -8px;
+            transition: background-color 0.2s ease, height 0.2s ease;
+        }
+        
+        .scale-point.is-active .scale-tick {
+            background-color: var(--color-tick-active);
+            height: 14px;
+            bottom: 0;
+        }
+
+        /* Hlavní osa */
+        .slider-base-track {
+            position: relative;
+            width: 100%;
+            height: var(--slider-height);
+            background-color: var(--color-bg);
+            border-radius: 4px;
+            box-shadow: inset 0px 1px 4px #00000038;
+        }
+
+        .slider-highlight-track {
+            position: absolute;
+            height: 100%;
+            background-color: var(--color-track);
+            background: #3B82F6;
+background: linear-gradient(0deg, rgba(59, 130, 246, 1) 0%, rgb(95, 157, 254) 50%, rgba(59, 130, 246, 1) 100%);
+            border-radius: 4px;
+            pointer-events: none;
+            cursor: grab;
+            pointer-events: auto; /* Změna: track nyní zachytává kliknutí myší */
+        }
+        
+        .slider-highlight-track:active {
+            cursor: grabbing;
+        }
+        
+        .slider-highlight-track:hover {
+background: linear-gradient(0deg, rgba(59, 130, 246, 1) 0%, rgb(95, 157, 254) 20%,  rgb(95, 157, 254) 80%, rgba(59, 130, 246, 1) 100%);
+        }
+
+        .slider-handle {
+            position: absolute;
+            top: 50%;
+            width: var(--handle-size);
+            height: var(--handle-size);
+            background-color: var(--color-handle);
+background: radial-gradient(circle, rgb(60, 91, 190) 0%, rgba(30, 64, 175, 1) 50%);
+            border-radius: 50%;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+            user-select: none;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        .slider-handle:active {
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+
+        .slider-handle:hover {
+background: radial-gradient(circle, rgb(89, 113, 192) 10%, rgba(30, 64, 175, 1) 90%);
+        }
+
+.btn {
+	border: none;
+	padding: 2px 6px 4px 6px;
+	font-size: 25px;
+	font-weight: bold;
+	border-radius: 6px;
+	cursor: pointer;
+	margin: 5px;
+	line-height: 20px;
+	transition: background-color 0.2s;
+	width: auto;
+	height: auto;
+	position: relative;
+	right: auto;
+	user-select: none;
+	opacity: 0.73;
+}
+
+        .btn-plus { background-color: #10b981; color: white; }
+        .btn-plus:hover { background-color: #059669; } 
+.btn-minus {
+	background-color: #ef4444;
+	color: white;
+	display: none;
+	padding: 2px 7.3px 6px 7.3px;
+	font-size: 35px;
+	line-height: 18px;
+}
+        .btn-minus:hover { background-color: #dc2626; }
+
+        /* Náhled odesílaných dat pro kontrolu */
+        .preview-box {
+            margin-top: 25px;
+            background: #f1f5f9;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #475569;
+        }
+    </style>
+    
+    
+  <style>
+
+    /* Obal pro celý widget záložek */
+    .tabs-wrapper {
+      width: 100%;
+      max-width: 600px; /* Maximální šířka na desktopu */
+      grid-column: span 3;
+    }
+
+    /* Panel tlačítek - HLAVNÍ ZMĚNA: vycentrování */
+    .tab-buttons {
+	display: flex;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 10px;
+	padding: 0px 0px 0px 0px;
+	border-bottom: 3px solid #9da2a8;
+	border-radius: 10px 10px 0 0;
+}
+
+    /* Základní styl tlačítek (nezvýrazněné) */
+    .tab-btn {
+	padding: 7px 3px;
+	border: none;
+	background-color: #e9e9ed;
+	color: #444;
+	cursor: pointer;
+	border-radius: 6px 6px 0 0;
+	font-weight: 600;
+	font-size: 12px;
+	max-width: 70px;
+	margin-top: 0px;
+	border: 1px solid #b4bac0;
+	border-bottom: 0px solid white;
+}
+
+    /* 1. Efekt při najetí myší (trochu zvýrazněný) */
+.tab-btn:hover {
+	background-color: #dedede;
+}
+
+    /* 2. Styl pro aktivní/kliknuté tlačítko (nejvíc zvýrazněné) */
+.tab-btn.active {
+	background-color: #ffffff;
+	color: #0f172a;
+	border: 1px solid #9da2a8;
+	border-bottom: 3px solid #fff;
+	margin-bottom: -3px;
+}
+
+    /* Obal pro veškerý obsah */
+.tab-container {
+	border-top: none;
+	padding: 0px;
+	background-color: #ffffff;
+	min-height: 100px;
+	padding-bottom: 10px;
+	padding-top: 10px;
+	margin-bottom: 0px;
+}
+
+    /* Skrytí všech obsahů standardně */
+    .tab-content {
+      display: none;
+    }
+
+    /* Zobrazení pouze aktivního obsahu */
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Nadpisy a texty uvnitř obsahu */
+.tab-content h3 {
+	margin-bottom: 0px;
+	color: #444;
+	font-size: 14px;
+	margin-top: 10px;
+}
+
+.tab-content p {
+	line-height: 1.2;
+	color: #444;
+	color: #3d3d3d;
+	/* margin-bottom: 15px; */
+	font-size: 14px;
+	margin-top: 7px;
+}
+
+    /* RESPONZIVITA: Úprava pro mobily a malé obrazovky */
+    @media (max-width: 480px) {
+      .tab-buttons {
+        flex-direction: column; /* Tlačítka půjdou pod sebe */
+        padding: 0px;
+        border-bottom: none;
+      }
+      .tab-btn {
+        border-radius: 6px;
+        width: 100%; /* Tlačítka budou přes celou šířku */
+        text-align: center;
+      }
+      .tab-btn.active {
+        margin-bottom: 0;
+        border-bottom: 2px solid #cbd5e1; /* Na mobilu vrátíme spodní hranu */
+        background-color: #1e293b; /* Kontrastnější barva pro aktivní na mobilu */
+        color: #ffffff;
+      }
+      .tab-container {
+        border-top: 2px solid #cbd5e1;
+        border-radius: 8px;
+        margin-top: 10px;
+      }
+    }
+  </style>
+  
+     <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            background-color: #ffffff;
+            box-shadow: 0 0px 0px rgba(0,0,0,0.1);
+            border: 2px solid #b4bac0;
+        }
+        th, td {
+            padding: 12px 15px;
+  padding: 6px 5px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+            border-right: 1px solid #b4bac0;
+            color: hsl(0, 0%, 12%);
+  font-size: 15px;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            color: #444;
+            background-color: #e9e9ed;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 7px 3px;
+            padding-right: 30px; /* Prostor pro šipku */
+  box-sizing: border-box;
+            text-align: center;
+            border: 1px solid #b4bac0;
+        }
+        th:hover {
+            background-color: #45a049;
+            background-color: #dedede;
+        }
+        /* Stylování indikátoru řazení */
+        th::after {
+            content: '';
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.8em;
+            opacity: 0.6;
+        }
+        th.asc::after {
+            content: '▲';
+            opacity: 1;
+        }
+        th.desc::after {
+            content: '▼';
+            opacity: 1;
+        }
+        th.ozn {
+background-color: #ffffff;
+  color: #0f172a;
+  border: 1px solid #9da2a8;
+        }
+        /* Každý druhý řádek má zvýrazněné pozadí */
+        tbody tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+       /*  tbody tr:hover {
+            background-color: #e2f0d9;
+        }
+        Jemné odlišení prázdných buněk pro přehlednost 
+        td:empty::after {
+            content: '—';
+            color: #ccc;
+        }*/
+    </style>
+
+</head>
+<body>
+
+<div id="mapa-kontainer"></div>
+
+    <div class="resizer"><div class="resizer2"><div class="resizer3"></div></div></div>
+
+<div class="vegetacni-panel">
+	
+    <h4 style="margin: 10px 10px 5px 10px;text-align: center;">Biologicky efektivní suma teplot a srážky</h4>
+    <span style="margin:0px 10px 10px 10px;text-align: center; font-size:14px;">Celý program i s databází si můžete stáhnout na <a href="https://github.com/h8jek1-max/small_useful_programs" >Githubu</a></span>
+	
+<div class="controls">
+        
+    <div style="grid-column: span 1;" id="nema">
+    <div style="border: 1px solid #dddcdc; border-radius: 5px; padding-top:3px; margin-bottom: 2px; max-width: 120px;">
+        <label style="display: inline-flex; align-items: center; cursor: pointer; margin-bottom: 4px;">
+            <input type="checkbox" id="bdd" onclick="jezaskr(this.id);
+            "  style="width: auto; margin-right: 4px;transform: scale(1.3);" >
+            Zobrazit BEDD
+        </label>
+        <label style="display: inline-flex; align-items: center; cursor: pointer; margin-bottom: 4px;">
+            <input type="checkbox" id="srazky" onclick="jezaskr(this.id);
+            " style="width: auto; margin-right: 4px;transform: scale(1.3);" >
+            Zobrazit srážky
+        </label>
+        </div>
+        <label style="display: inline-flex; align-items: center; cursor: pointer; margin-bottom: 4px;">
+            <input type="checkbox" id="vegetace" onclick="jezaskr(this.id);
+            " style="width: auto; margin-right: 4px;transform: scale(1.3);" >
+            Doba vegetace
+        </label>
+    </div>
+    
+    <div style="grid-column: span 3; display: block; color: hsl(0, 0%, 12%);
+  font-size: 15px;
+  line-height: 1.3;"  id="vysv" >
+        <p>
+		Databáze pochází z agroklimatického datasetu  <a href="https://cds.climate.copernicus.eu/datasets" >Copernicus</a> (C3S) Prostorová mřížka má rozměr 720 × 360 bodů s krokem 0,5°. 
+		Časový krok je dekádní (po deseti dnech). Měsíc je rozdělen na 3 dekády (5., 15. a 25. den v měsíci).
+		</p>
+        <h4>BEDD (Biologically Effective Degree Days)</h4>
+        <p>
+        Biologicky efektivní suma teplot za deset dní. Počítá akumulované teplo upravené o biologické limity plodin.
+        Model ukazuje 6 různých biologických scénářů (sumace nad 0 °C, 2 °C, 4 °C, 6 °C, 8 °C a 10 °C).
+         Pro zemědělství je klíčová hladina nad 5 °C nebo 10 °C (základ pro kukuřici, révu a teplomilné plodiny).
+		</p>
+        <h4>RR (Precipitation)</h4>
+        <p>
+         Celkový srážkový úhrn za deset dní v milimetrech (mm).
+		</p>
+        <h4>Doba růstu vegetace</h4>
+        <p>
+         Tyto data nejsou součástí databáze Copernicus, ale hrubý odhad vypočítaný z jejich dat. Tento výpočet se snaží o vyjádření procentního stavu k celkové maximální produktivity vegetace. Z dostupných dat (RR a BEDD za dekádu, plus šířka a datum) se dá spočítat: Záření Ra se spočítá přesně ze šířky a data. Průměrná teplota vychází z BEDD0 děleného počtem dní. PET se počítá Oudinovým vzorcem z Ra a teploty. Sníh (stupňodenní tání) a Ks podle FAO-56.
+		</p>
+        <p>
+         <b>Návod:</b> Vyberte si v levém sloupci, která data si chcete prohlížet. Poté klikněte do mapy, aby jste získaly souřadnice, nebo je zapište do textového pole pro GPS. Pod grafem najdete odkaz na výpis a export  dat v různých formátech.
+		</p>
+    </div>
+    
+    <div style="grid-column: span 1; display: none;" >
+        <label>Zeměpisné souřadnice (GPS)</label>
+        <input type="text" id="gps_vstup" value="50.08, 14.43" onchange="vynutObnoveniGrafu()" placeholder="Formát:  50.62,15.09" >
+    </div>
+
+    <div style="grid-column: span 1; display: none;" >
+        <label>Trend (let)</label>
+        <select id="trend_segment" onchange="prekresliGslMapu();vynutObnoveniGrafu()">
+            <option value="NONE" selected>Nevypočítávat trend v mapě i v grafu</option>
+            <option value="0">Celé období</option>
+            <option value="3">Po dekádách</option>
+            <option value="5">Po roce</option>
+            <option value="10">Po 5 letech</option>
+            <option value="15">Po 10 letech</option>
+            <option value="20">Po 20 letech</option>
+        </select>
+    </div>
+    
+    <!-- 2. SLIDER: DEKÁDY -->
+    <div class="slider-section"  style=" display: none;" >
+        <h2>Výběr z částí roku po deseti dnech (dekády)</h2>
+        <div id="slider-dekady-kontejner"></div>
+    </div>
+
+    <!-- 3. SLIDER: HLADINY -->
+    <div class="slider-section"  id="bdd_vyber" style=" display: none;" >
+        <h2>Klasifikace růstu rostlin v rozmezí teplot (BEDD)</h2>
+        <div id="slider-hladiny-kontejner"></div>
+    </div>
+
+    <!-- 4. NASTAVENÍ VEGETAČNÍHO MODELU -->
+    <div class="slider-section" id="veg_nastaveni" style="display: none;">
+        <h2>Model vegetace: půda, kořeny, vztažná hodnota</h2>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:8px; margin-top:6px;">
+            <div><label>Půdní textura</label>
+                <select id="veg_puda" onchange="vegZmenaModelu()">
+                    <option value="pisek">písek</option>
+                    <option value="hlinitopisek">hlinitý písek</option>
+                    <option value="pisc_hlina">písčitá hlína</option>
+                    <option value="hlina" selected>hlína</option>
+                    <option value="prach_hlina">prachovitá hlína</option>
+                    <option value="jil_hlina">jílovitá hlína</option>
+                    <option value="jil">jíl</option>
+                </select></div>
+            <div><label>Hloubka kořenové zóny</label>
+                <select id="veg_koreny" onchange="vegZmenaModelu()">
+                    <option value="0.5">0,5 m (tráva, plodiny)</option>
+                    <option value="1">1 m</option>
+                    <option value="1.5">1,5 m</option>
+                    <option value="2" selected>2 m (les, keře)</option>
+                    <option value="3">3 m (hluboce kořenící)</option>
+                </select></div>
+            <div><label>100 % znamená</label>
+                <select id="veg_ref" onchange="vegZmenaModelu()">
+                    <option value="zeme" selected>maximum Země (záření, vlhké tropy)</option>
+                    <option value="misto">potenciál lokality (jen voda × teplo)</option>
+                </select></div>
+        </div>
+    </div>
+
+
+
+
+  <div class="tabs-wrapper" style=" display: none;" >
+    <!-- Vycentrovaná tlačítka záložek -->
+    <div class="tab-buttons">
+      <button class="tab-btn active" onclick="switchTab(event, 'obsah1')">Mapa</button>
+      <button class="tab-btn" onclick="switchTab(event, 'obsah2')">Graf</button>
+    </div>
+
+    <!-- Společný kontejner pro obsahy -->
+    <div class="tab-container">
+		
+      <div id="obsah1" class="tab-content active">
+		  
+		      <div style="grid-column: span 1;">
+        <label style="display: inline-flex; align-items: center; cursor: pointer; margin-bottom: 4px;">
+            <input type="checkbox" id="zobrazit" onchange="prekresliGslMapu()" style="width: auto; margin-right: 4px;transform: scale(1.3);" >
+            Zobrazit mapu předpovědi
+        </label>
+    </div>
+    
+    <div style="grid-column: span 3;" id="gsl_casovy_panel">
+        <label>Zvolený rok projekce pro zobrazení v mapě: <span id="gsl_rok_label" style="font-weight:bold; color:#e65100;">2011</span></label>
+        <center><input type="range" id="gsl_rok_slider" min="2011" max="2099" value="2011" step="1" oninput="posunulSeRokProjekce()" style="width: 90%;margin: auto;"></center>
+    </div>
+
+    <!-- Dynamická legenda mapy -->
+    <div id="mapa-legenda" class="pudni-panel" style="display:none; grid-column: span 3; color: #444;">
+        <b id="legenda-titulek" style="
+  font-size: 12px;">Legenda:</b>
+        <div id="legenda-barvy" style="display:flex; flex-wrap: wrap; gap:3px; max-width: 410px; margin: 4px auto 0px auto;  color: rgb(0, 0, 0);
+  font-size: 13px;
+      justify-content: center;
+      align-items: flex-start;"></div>
+    </div>
+		  
+      </div>
+      
+      
+      <div id="obsah2" class="tab-content">
+		  
+		      <!-- 1. SLIDER: ROKY -->
+    <div class="slider-section">
+        <h2>Předpověď od roku 2011 do 2099</h2>
+        <div id="slider-roky-kontejner"></div>
+    </div>
+    
+<div class="" id="gsl-graf-sekce" style="margin-top: 5px;">
+    <canvas id="gslGraf" width="1600" height="600" style="cursor: pointer; border: 1px solid #ddd; background: #fff; width: 100%; height: auto; border-radius: 6px; display:none;
+  opacity: 1;
+   transition: opacity 0s;" onclick="
+    if (this.style.position === 'fixed') {
+        const graf=document.getElementById('gslGraf');
+        graf.style.transition='opacity 0.5s';
+        graf.style.opacity='0';
+        setTimeout(function(){
+        graf.style.transition='opacity 0s';graf.style.position = ''; graf.style.left = ''; graf.style.top = ''; graf.style.transform = 'translate(0%, 0%)'; graf.style.zIndex = ''; graf.style.boxShadow = '';graf.style.opacity='1';}, 500);
+    } else {
+        const graf=document.getElementById('gslGraf');
+        graf.style.opacity='0';
+        graf.style.position = 'fixed'; graf.style.left = '50%'; graf.style.top = '50%'; graf.style.transform = 'translate(-50%, -50%)'; graf.style.zIndex = '1000'; graf.style.boxShadow = '0px 0px 300px rgba(0, 0, 0, 0.5)';
+        
+        setTimeout(function(){graf.style.transition='opacity 0.5s';
+        graf.style.opacity='1';}, 100);
+    }
+"></canvas>
+    <div class="dominantni-info" id="gsl-meta-info" >
+        Kliknutím do mapy zobrazíte graf budoucího vývoje na daných souřadnicích nebo je výše napište.
+    </div>
+    <div class="dominantni-info" id="tabulka"  style=" display:none; opacity: 0;
+	position: fixed;
+	top: 0px;
+	left: 50%;
+	transform: translate(-50%, 0%);
+	width: 100%;
+	min-width: 350px;
+	max-width: 900px;
+	height: 528px;
+	max-height: 100vh;
+	box-sizing: border-box;
+	overflow: hidden;
+	border-radius: 7px;
+	z-index: 1000;
+	box-shadow: rgba(0, 0, 0, 0.5) 0px 0px 300px, inset 0px 0px 300px rgb(239, 255, 232), inset 0px 0px 200px rgb(239, 255, 232), inset 0px 0px 100px rgb(239, 255, 232);
+	padding: 40px 0px 0px 0px;
+	transition: opacity 0.5s;
+  " >
+    </div>
+</div>
+		  
+      </div>
+      
+    </div>
+  </div>
+  
+  
+    
+    
+<div  id="ods" style="display: none;">
+    
+        <label style="display: inline-flex; align-items: center; cursor: pointer; margin-top: 12px;">
+            <input type="checkbox" id="rezim_percentil" onchange="vynutObnoveniGrafu()" style="width: auto; margin-right: 4px;transform: scale(1.3);"> Percentil
+        </label>
+    <div>
+        <label>Od roku</label>
+        <select id="rok_od" onchange="vynutObnoveniGrafu()"></select>
+
+        <label>Do roku</label>
+        <select id="rok_do" onchange="vynutObnoveniGrafu()"></select>
+    </div>
+    
+    <div style="grid-column: span 1;">
+        <label style="display: inline-flex; align-items: center; cursor: pointer; margin-bottom: 4px;">
+            Sledované období
+        </label>
+        <select id="trend_mesic" onchange="prekresliGslMapu(); vynutObnoveniGrafu();">
+            <option value="ALL" selected>Celoroční průměr</option>
+            <option value="CONTINUOUS">Všechny měsíce v řadě</option>
+            <option value="0">Leden</option>
+            <option value="1">Únor</option>
+            <option value="2">Březen</option>
+            <option value="3">Duben</option>
+            <option value="4">Květen</option>
+            <option value="5">Červen</option>
+            <option value="6">Červenec</option>
+            <option value="7">Srpen</option>
+            <option value="8">Září</option>
+            <option value="9">Říjen</option>
+            <option value="10">Listopad</option>
+            <option value="11">Prosinec</option>
+        </select>
+    </div>     
+    
+    </div>    
+    
+    
+    
+</div>
+    
+</div>
+
+<script>
+	
+function sesbiratParametryAplikace() {
+    // 1. Základní stav zaškrtávacích políček v sekci .controls
+    const bddChecked = document.getElementById('bdd')?.checked || false;
+    const srazkyChecked = document.getElementById('srazky')?.checked || false;
+    const vegetaceChecked = document.getElementById('vegetace')?.checked || false;
+
+    // 2. Vstupy pro GPS a trend
+    const gpsVstup = document.getElementById('gps_vstup')?.value.trim() || '';
+    const trendSegment = document.getElementById('trend_segment')?.value || 'NONE';
+
+    // 3. Stav záložek / mapy / roků projekce
+    const zobrazitMapu = document.getElementById('zobrazit')?.checked || false;
+    const rokProjekce = document.getElementById('gsl_rok_slider')?.value || '2011';
+    const trendMesic = document.getElementById('trend_mesic')?.value || 'ALL';
+
+    // 4. Bezpečný sběr hodnot ze všech hidden inputů multi-sliderů
+    let vybraneRoky = [];
+    let vybraneDekady = [];
+    let vybraneHladiny = [];
+
+    try {
+        // Hledáme jakkoliv hluboko v DOMu podle třídy nebo name atributu
+        const inputRoky = document.querySelector('input.slider-hidden-input[name="vybrane_roky"]') || document.getElementById('vybrane_roky');
+        if (inputRoky && inputRoky.value) vybraneRoky = JSON.parse(inputRoky.value);
+
+        const inputDekady = document.querySelector('input.slider-hidden-input[name="vybrane_dekady"]') || document.getElementById('vybrane_dekady');
+        if (inputDekady && inputDekady.value) vybraneDekady = JSON.parse(inputDekady.value);
+
+        const inputHladiny = document.querySelector('input.slider-hidden-input[name="vybrane_hladiny"]') || document.getElementById('vybrane_hladiny');
+        if (inputHladiny && inputHladiny.value) vybraneHladiny = JSON.parse(inputHladiny.value);
+    } catch (e) {
+        console.warn("Chyba při parsování hodnot z multi-sliderů:", e);
+    }
+
+    // Kompletní objekt parametrů
+    const stavAplikace = {
+        rezimZobrazeni: {
+            bdd: bddChecked,
+            srazky: srazkyChecked,
+            vegetace: vegetaceChecked
+        },
+        geolokace: gpsVstup,
+        trendSegment: trendSegment,
+        mapaAktivni: zobrazitMapu,
+        rokProjekce: parseInt(rokProjekce, 10),
+        sledovaneObdobie: trendMesic,
+        filtrySlideru: {
+            roky: vybraneRoky,
+            dekady: vybraneDekady,
+            hladiny: vybraneHladiny
+        }
+    };
+    // Výpis do konzole a alert pro okamžitou kontrolu
+   // console.log("=== AKTUÁLNÍ PARAMETRY APLIKACE ===", stavAplikace);
+    //alert("Parametry byly úspěšně sesbírané. Hodnoty hladin: " + JSON.stringify(vybraneHladiny));
+    return stavAplikace;
+}
+	
+ function jezaskr(id) {
+    const srazky = document.getElementById("srazky");
+    const bdd = document.getElementById("bdd");
+    const vegetace = document.getElementById("vegetace");
+    const nema = document.getElementById("nema");
+     const con = document.querySelector('.controls')
+    const legPanel = document.getElementById("mapa-legenda");
+    const casovyPanel = document.getElementById("gsl_casovy_panel");
+    const vysv = document.getElementById("vysv");
+	 
+               if ((bdd.checked || srazky.checked) && id != 'vegetace') {
+				    Array.from(con.children).forEach(b => {
+						 if ((!bdd.checked && b.id == 'bdd_vyber') || b.id == 'veg_nastaveni') {b.style.display = 'none';} else  {b.style.display = 'block';} 
+				   });
+				    vegetace.checked = false; vysv.style.display = "none";
+                } else if (vegetace.checked && (id == 'vegetace' || id == '')) {
+                   Array.from(con.children).forEach(b => { 
+					 if (b.id == 'bdd_vyber') {b.style.display = 'none';} else  {b.style.display = 'block';} 
+					 });
+					bdd.checked = false;  srazky.checked = false; vysv.style.display = "none";
+					 
+               } else {  Array.from(con.children).forEach(b => { if ( b.id !== nema.id) { b.style.display = 'none';}; }); vysv.style.display = "block";
+			   } 
+                
+        if (casovyPanel) casovyPanel.style.display = "none";
+        if (legPanel) legPanel.style.display = "none";
+    document.getElementById("zobrazit").checked = false;
+               vynutObnoveniGrafu();
+               prekresliGslMapu();
+               
+               
+    document.getElementById("ods").style.display = 'none';
+}
+	
+const panel = document.querySelector('.vegetacni-panel');
+const resizer = document.querySelector('.resizer');
+const resizer2 = document.querySelector('.resizer2');
+const resizer3 = document.querySelector('.resizer3');
+resizer.addEventListener('mousedown', initResize, false);
+resizer2.addEventListener('mousedown', poz, false);
+
+function poz() {
+    if(panel.style.width !== "0px"){
+        panel.style.opacity = "0";
+        setTimeout( function () { 
+            panel.style.minWidth = "0px";
+            panel.style.width = "0px";
+            panel.style.padding = "0px";
+            resizer.style.width = "0px";
+            resizer2.style.left = "-28px";
+            resizer2.style.width = "25px";
+            resizer2.style.transform = "scaleX(-1)";
+            resizer3.style.opacity = "1";
+            panel.style.transition = "width 0.2s"; 
+        } , 50 );
+    } else {
+        panel.style.minWidth = "20%";
+        panel.style.width = "45%";
+        panel.style.padding = "0px 5px 0px 10px";
+        resizer.style.width = "8px";
+        resizer2.style.left = "0px";
+        resizer2.style.width = "17px";
+        resizer2.style.transform = "scaleX(1)";
+        resizer3.style.opacity = "0.25";
+        setTimeout( function () { panel.style.opacity = "1"; } , 200 );
+    }
+}
+
+function initResize(e) {
+    e.preventDefault();
+    window.addEventListener('mousemove', StartResize, false);
+    window.addEventListener('mouseup', StopResize, false);
+}
+
+function StartResize(e) {
+    const panelRight = panel.getBoundingClientRect().right;
+    const newWidth = panelRight - e.clientX;
+    panel.style.width = newWidth + 'px';
+}
+
+function StopResize() {
+    window.removeEventListener('mousemove', StartResize, false);
+    window.removeEventListener('mouseup', StopResize, false);
+}
+
+async function nactiGeografickeUdaje(lat, lon) {
+	
+    try {
+        // Oprava URL adresy: přidáno /reverse.php a korektní query string
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&addressdetails=1`, {
+        });
+        if(!res.ok) throw new Error("CORS / Síťová chyba");
+        const geo = await res.json();
+        
+        if(geo.address) {
+            const a = geo.address;
+            // Inteligentní skládání názvu obce podle hierarchie OSM
+            const obec =  a.hamlet || a.village || a.town || a.city || a.suburb || "Neznámé místo";
+            const okres = a.county || a.district || a.state_district || "-";
+            const stat = a.country || "-";
+            
+            const lokace = obec+", "+okres+", "+stat;
+            return lokace;
+        }
+    } catch(e) {
+        console.warn("Geolokace selhala:", e);
+         throw e;
+    }
+}
+
+// Inicializace ročních selektorů při startu podle časové osy TAS (2011-2099)
+const START_ROK_TAS = 2011;
+const CELKEM_MESICU_TAS = 1020; // 85 let x 12 měsíců
+
+const selOd = document.getElementById("rok_od");
+const selDo = document.getElementById("rok_do");
+if (selOd && selDo && selOd.options.length === 0) {
+    for (let r = START_ROK_TAS; r <= 2099; r++) {
+        selOd.options[selOd.options.length] = new Option(r, r);
+        selDo.options[selDo.options.length] = new Option(r, r);
+    }
+    selDo.value = 2099;
+}
+
+// agric_dekoder.js – čtení databáze vytvořené slucovac.py (verze 2)
+// Stejné API jako GlobálníSrazkyDataManager: uzel(), zajisti(), + řady srážek a BEDD.
+// Použití v prohlížeči:   const db = new AgricDB(); await db.init();
+//                         const u = db.uzel(49.8, 18.3); await db.zajisti([u.tile]);
+//                         const rr = db.serieRR(u);  const b10 = db.serieBedd(u, 5);
+class AgricDB {
+    constructor(urlRejstrik = 'registrace_agric_c3s.json', urlPost = 'get_agric_post.php') {
+        this.urlRejstrik = urlRejstrik; this.urlPost = urlPost;
+        this.dlazdice = new Map();      // tile_id -> {n, rr: Uint8Array, h1: Uint8Array, rank}
+        this.rozpracovane = new Map();
+        this.fronta = new Map();
+        this.timer = null; this.odkladMs = 35;
+    }
+
+    async init(registr = null) {
+        const r = registr || await (await fetch(this.urlRejstrik)).json();
+        if (r.verze !== 2) throw new Error('Nepodporovaná verze databáze: ' + r.verze);
+        this.r = r; const m = r.mrizka;
+        this.m = m; this.nt = r.pocet_kroku;
+        // maska pevniny (bity MSB první, řádek po řádku od severu)
+        const bin = typeof atob === 'function' ? Uint8Array.from(atob(r.maska_pevniny_b64), c => c.charCodeAt(0))
+                                               : new Uint8Array(Buffer.from(r.maska_pevniny_b64, 'base64'));
+        this.maska = new Uint8Array(m.radku * m.ncols);
+        for (let i = 0; i < this.maska.length; i++) this.maska[i] = (bin[i >> 3] >> (7 - (i & 7))) & 1;
+        this.rrLut = Float32Array.from(r.rr_lut);
+        this.dny = Uint8Array.from(r.dny);
+        this.kodChybi = r.kod_chybi;
+        this.NB = r.pasma_lat.length + 1; this.NK = r.h1_max_kod + 1;
+        this.kal = r.kalibrace.map(k => k.map(b => Float32Array.from(b)));   // [hladina 0..4][pásmo][kód]
+        return this;
+    }
+
+    // GPS -> buňka mřížky; vrací null pro moře / mimo mřížku
+    uzel(lat, lon) {
+        const m = this.m;
+        let l = (parseFloat(lon) - (m.lon0 - m.dx / 2)) % 360; if (l < 0) l += 360;
+        const col = Math.floor(l / m.dx) % m.ncols;
+        const row = Math.floor((m.lat0 + m.dy / 2 - parseFloat(lat)) / m.dy);
+        if (row < 0 || row >= m.radku) return null;
+        if (!this.maska[row * m.ncols + col]) return null;
+        const tile = Math.floor(row / m.tile) * m.dlazdic_x + Math.floor(col / m.tile);
+        return { col, row, tile, lat: m.lat0 - row * m.dy };
+    }
+
+    // pozice buňky v dlaždici (pořadí pevniny po řádcích) – jen z masky, nic se nestahuje
+    _priprav(tileId) {
+        const m = this.m, T = m.tile;
+        const ty = Math.floor(tileId / m.dlazdic_x), tx = tileId % m.dlazdic_x;
+        const rank = new Int32Array(T * T).fill(-1);
+        const P = []; let n = 0;
+        for (let r = 0; r < T; r++) for (let c = 0; c < T; c++) {
+            const R = ty * T + r, C = tx * T + c;
+            if (R < m.radku && C < m.ncols && this.maska[R * m.ncols + C]) rank[r * T + c] = n++;
+        }
+        const Pa = new Int32Array(n); let i = 0;
+        for (let r = 0; r < T; r++) for (let c = 0; c < T; c++) {
+            if (rank[r * T + c] < 0) continue;
+            let p = -1;
+            if (c > 0 && rank[r * T + c - 1] >= 0) p = rank[r * T + c - 1];
+            else if (r > 0 && rank[(r - 1) * T + c] >= 0) p = rank[(r - 1) * T + c];
+            Pa[i++] = p;
+        }
+        return { n, rank, P: Pa };
+    }
+
+    static _inverze(plane, n, nt, P, mode) {
+        if (mode === 2 || mode === 3) {
+            for (let c = 0; c < n; c++) {
+                const p = P[c]; if (p < 0) continue;
+                const o = c * nt, q = p * nt;
+                for (let t = 0; t < nt; t++) plane[o + t] += plane[q + t];      // Uint8Array = modulo 256
+            }
+        }
+        if (mode === 1 || mode === 3) {
+            for (let c = 0; c < n; c++) {
+                const o = c * nt; let s = 0;
+                for (let t = 0; t < nt; t++) { s = (s + plane[o + t]) & 255; plane[o + t] = s; }
+            }
+        }
+    }
+
+    // rozbalená dlaždice -> {rr, h1} připravené k přímému čtení
+    _sestavDlazdici(tileId, buf) {
+        const { n, rank, P } = this._priprav(tileId), nt = this.nt;
+        if (buf.length !== 2 * n * nt) throw new Error(`Dlaždice ${tileId}: ${buf.length} B, čekáno ${2 * n * nt} B`);
+        const rr = buf.subarray(0, n * nt), h1 = buf.subarray(n * nt, 2 * n * nt);
+        AgricDB._inverze(rr, n, nt, P, this.r.filtr_rr);
+        AgricDB._inverze(h1, n, nt, P, this.r.filtr_h1);
+        return { n, rank, rr, h1 };
+    }
+
+    _radaUzlu(u) {
+        const d = this.dlazdice.get(u.tile); if (!d) return null;
+        const T = this.m.tile;
+        const k = d.rank[(u.row % T) * T + (u.col % T)];
+        const o = k * this.nt;
+        return { rr: d.rr.subarray(o, o + this.nt), h1: d.h1.subarray(o, o + this.nt) };
+    }
+
+    // ---------- veřejné čtení (dlaždice musí být zajištěna) ----------
+    serieRR(u) {                                  // mm / dekádu, NaN = chybí
+        const a = this._radaUzlu(u); if (!a) return null;
+        const out = new Float32Array(this.nt);
+        for (let t = 0; t < this.nt; t++) out[t] = a.rr[t] === this.kodChybi ? NaN : this.rrLut[a.rr[t]];
+        return out;
+    }
+    pasmo(lat) { const p = this.r.pasma_lat, a = Math.abs(lat); let b = 0; while (b < p.length && a >= p[b]) b++; return b; }
+
+    // úroveň: 0 = 0 °C, 1 = 2 °C, 2 = 4 °C, 3 = 6 °C, 4 = 8 °C, 5 = 10 °C; výsledek ve °C·dnech za dekádu
+    serieBedd(u, uroven) {
+        const a = this._radaUzlu(u); if (!a) return null;
+        const out = new Float32Array(this.nt), b = this.pasmo(u.lat), krok = this.r.h1_krok;
+        const tab = uroven > 0 ? this.kal[uroven - 1][b] : null;
+        for (let t = 0; t < this.nt; t++) {
+            const k = a.h1[t];
+            out[t] = k === this.kodChybi ? NaN : this.dny[t] * (uroven === 0 ? k * krok : tab[k]);
+        }
+        return out;
+    }
+    // všech 6 hladin v jednom kroku (pro mapu)
+    beddKrok(u, t) {
+        const a = this._radaUzlu(u); if (!a) return null;
+        const k = a.h1[t]; if (k === this.kodChybi) return null;
+        const b = this.pasmo(u.lat), n = this.dny[t];
+        const out = [n * k * this.r.h1_krok];
+        for (let h = 0; h < 5; h++) out.push(n * this.kal[h][b][k]);
+        return out;
+    }
+    
+    // Bez alokací: naplní rr[nt] a b[h*nt + t] (h = 0..5, °C·dny za dekádu) pro daný uzel. Vrací false, když dlaždice chybí.
+    naplnRady(u, rr, b) {
+        const a = this._radaUzlu(u); if (!a) return false;
+        const nt = this.nt, kc = this.kodChybi, krok = this.r.h1_krok, bp = this.pasmo(u.lat), dny = this.dny;
+        const tab = [null]; for (let h = 0; h < 5; h++) tab.push(this.kal[h][bp]);
+        for (let t = 0; t < nt; t++) {
+            const k = a.h1[t], r = a.rr[t], n = dny[t];
+            rr[t] = r === kc ? NaN : this.rrLut[r];
+            if (k === kc) { for (let h = 0; h < 6; h++) b[h * nt + t] = NaN; continue; }
+            b[t] = n * k * krok;
+            for (let h = 1; h < 6; h++) b[h * nt + t] = n * tab[h][k];
+        }
+        return true;
+    }
+
+    // Vrací měsíční úhrny srážek v mm/měsíc (sloučením 3 dekád v každém měsíci)
+    serieRRMesicni(u) {
+        const dekady = this.serieRR(u);
+        if (!dekady) return null;
+
+        const pocetMesicu = Math.floor(dekady.length / 3);
+        const mesicniSrazky = new Float32Array(pocetMesicu);
+
+        for (let m = 0; m < pocetMesicu; m++) {
+            let suma = 0;
+            let platne = 0;
+            for (let d = 0; d < 3; d++) {
+                const val = dekady[m * 3 + d];
+                if (!isNaN(val)) {
+                    suma += val;
+                    platne++;
+                }
+            }
+            mesicniSrazky[m] = platne > 0 ? suma : NaN;
+        }
+        return mesicniSrazky;
+    }
+
+    // ---------- stahování (stejný protokol jako get_srazky_post.php) ----------
+    zajisti(tileIds) { return Promise.all(tileIds.map(id => this._pozadej(id))); }
+    _pozadej(id) {
+        if (this.dlazdice.has(id)) return Promise.resolve();
+        let p = this.rozpracovane.get(id); if (p) return p;
+        p = new Promise((resolve, reject) => this.fronta.set(id, { resolve, reject }));
+        this.rozpracovane.set(id, p);
+        if (this.timer) clearTimeout(this.timer);
+        this.timer = setTimeout(() => this._odesli(), this.odkladMs);
+        return p;
+    }
+    async _odesli() {
+        this.timer = null;
+        const davka = Array.from(this.fronta.entries()); this.fronta.clear();
+        if (!davka.length) return;
+        const selhani = err => davka.forEach(([id, cb]) => { this.rozpracovane.delete(id); cb.reject(err); });
+        try {
+            const res = await fetch(this.urlPost, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ tile_ids: davka.map(d => d[0]) }) });
+            if (!res.ok) throw new Error('Server vrátil HTTP ' + res.status);
+            const buf = await res.arrayBuffer(), view = new DataView(buf);
+            let off = 0; const useky = [];
+            for (const [id, cb] of davka) {
+                if (off + 4 > buf.byteLength) throw new Error('Zkrácená odpověď (dlaždice ' + id + ')');
+                const delka = view.getUint32(off, false); off += 4;
+                if (off + delka > buf.byteLength) throw new Error('Zkrácená odpověď (dlaždice ' + id + ')');
+                useky.push({ id, cb, gz: new Uint8Array(buf, off, delka) }); off += delka;
+            }
+            await Promise.all(useky.map(u => this._rozbal(u)));
+        } catch (e) { console.error('Chyba načtení dlaždic:', e); selhani(e); }
+    }
+    async _rozbal({ id, cb, gz }) {
+        try {
+            const d = gz.length === 0 ? { n: 0, rank: new Int32Array(this.m.tile ** 2).fill(-1), rr: new Uint8Array(0), h1: new Uint8Array(0) }
+                                      : this._sestavDlazdici(id, await AgricDB.rozbalGzip(gz));
+            this.dlazdice.set(id, d); this.rozpracovane.delete(id); cb.resolve();
+        } catch (e) { this.rozpracovane.delete(id); cb.reject(e); }
+    }
+    static async rozbalGzip(u8) {
+        const s = new Blob([u8]).stream().pipeThrough(new DecompressionStream('gzip'));
+        return new Uint8Array(await new Response(s).arrayBuffer());
+    }
+}
+if (typeof module !== 'undefined') module.exports = AgricDB;
+// Inicializace srážkového manažera plně kompatibilního se zbytkem šablony
+const gslKlientskaPamet = new AgricDB(); //await db.init();
+//const gslKlientskaPamet = new GlobálníSrazkyDataManager();
+let gslTileLayerLeaflet = null;
+let aktualniMarker = null;
+
+
+// =============================================================================
+// INICIALIZACE MAPY LEAFLET A MĚŘÍTKA
+// =============================================================================
+const map = L.map('mapa-kontainer').setView([50.62, 15.09], 9);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 22, attribution: '© OpenStreetMap'
+}).addTo(map);
+
+L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
+
+map.on('click', function(e) {
+    const lat = e.latlng.lat.toFixed(4);
+    const lon = e.latlng.lng.toFixed(4);
+    const gpsVstup = document.getElementById("gps_vstup");
+    if (gpsVstup) gpsVstup.value = `${lat}, ${lon}`;
+    
+    nactiGslHistoriiProGraf(lat, lon);
+});
+
+// Jediná definice (dříve byly dvě a ta pozdější přepisovala debounce).
+// Mapa: max. 1 překreslení na snímek (cache dělá dotaz O(1)); graf: debounce 400 ms jen při volání z MultiSlideru.
+let vegRafId = 0, vegGrafTimer = null;
+function posunulSeRokProjekce() {
+    const rokEl = document.getElementById("gsl_rok_slider");
+    const lab = document.getElementById("gsl_rok_label");
+    if (rokEl && lab) lab.innerText = rokEl.value;
+    if (!vegRafId) vegRafId = requestAnimationFrame(() => {
+        vegRafId = 0;
+        if (gslTileLayerLeaflet) gslTileLayerLeaflet.redraw();
+    });
+    if (arguments.length) {                       // volání z MultiSlideru (roky / dekády)
+        clearTimeout(vegGrafTimer);
+        vegGrafTimer = setTimeout(vynutObnoveniGrafu, 400);
+    }
+}
+
+function vynutObnoveniGrafu() {
+    const gpsVstup = document.getElementById("gps_vstup").value;
+    if (gpsVstup) {
+        const castiGps = gpsVstup.split(',').map(num => parseFloat(num.trim()));
+        if(castiGps.length === 2 && !isNaN(castiGps[0])) {
+            const lat = castiGps[0].toFixed(4);
+            const lon = castiGps[1].toFixed(4);
+            nactiGslHistoriiProGraf(lat, lon);
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+// =============================================================================
+// VEGETAČNÍ MODEL v3 – dekádní vodní bilance + teplotní odezva z pásem BEDD
+// -----------------------------------------------------------------------------
+// vstup na uzel mřížky: RR (mm/dekádu) a BEDD pro 6 hladin (0,2,4,6,8,10 °C)
+// 1) teplota  : BEDD hladiny jsou vnořené součty -> rozdíly sousedních hladin dávají
+//               DISJUNKTNÍ pásma (0-2, 2-4, ... 8-10, >10 °C). Součet
+//               sklon_pásma × stupňodny_pásma je přesně součet odezvy r(T) přes dny,
+//               pokud je r(T) po částech lineární s lomy na hladinách (sklon = koeficient pásma).
+// 2) výpar    : PET podle Oudina (Ra z šířky a data + průměrná teplota), × Kc podle teplotní fáze
+// 3) voda     : sníh (stupňodenní tání), povrchový odtok dle půdy a nasycení, zásobník kořenové
+//               zóny (spodní odtok = přebytek), útlum výparu Ks dle FAO-56
+// 4) výstup   : q = fT × (AET/PETc) za dekádu; v mapě buď % maxima Země (záření), nebo % potenciálu místa
+// =============================================================================
+const VEG = {
+    SKLON: [0.015, 0.025, 0.04, 0.05, 0.06, 0.065], // růstová odezva na 1 °C v pásmech 0-2,2-4,4-6,6-8,8-10,>10 °C
+    PUDY: {                                  // awc = využitelná kapacita mm/m, ro = základní podíl povrchového odtoku
+        pisek:        { awc:  70, ro: 0.04 },
+        hlinitopisek: { awc:  95, ro: 0.06 },
+        pisc_hlina:   { awc: 125, ro: 0.09 },
+        hlina:        { awc: 165, ro: 0.12 },
+        prach_hlina:  { awc: 190, ro: 0.15 },
+        jil_hlina:    { awc: 160, ro: 0.19 },
+        jil:          { awc: 140, ro: 0.25 }
+    },
+    KRIT: 0.5,       // pod tímto podílem zásoby kořenové zóny klesá transpirace (FAO-56, p = 0,5)
+    KC_MIN: 0.35,    // Kc bez vegetačního pokryvu
+    KC_ROZ: 0.75,    // Kc roste s teplotní fází: Kc = KC_MIN + KC_ROZ * sqrt(fT)
+    DDF: 3.5,        // mm tání na 1 °C·den (stupňodenní metoda)
+    LAMBDA: 2.45,    // MJ/kg, výparné teplo
+    MAX_UZLU: 16000  // limit cache (≈ 3,7 kB na uzel)
+};
+
+// záření na horní hranici atmosféry, MJ m-2 den-1 (FAO-56, rov. 21)
+function vegRa(latDeg, doy) {
+    const phi = Math.max(-89.5, Math.min(89.5, latDeg)) * Math.PI / 180;
+    const dr = 1 + 0.033 * Math.cos(2 * Math.PI * doy / 365);
+    const del = 0.409 * Math.sin(2 * Math.PI * doy / 365 - 1.39);
+    const ws = Math.acos(Math.max(-1, Math.min(1, -Math.tan(phi) * Math.tan(del))));
+    return (1440 / Math.PI) * 0.0820 * dr * (ws * Math.sin(phi) * Math.sin(del) + Math.cos(phi) * Math.cos(del) * Math.sin(ws));
+}
+
+// Jádro modelu: čisté pole -> pole, bez závislosti na DOM (lze testovat samostatně)
+// rr[nt], b[6*nt] (b[h*nt+t]), dny[nt], ra[36] -> Uint8Array(nt): 0..254 = fT*fW, 255 = chybí
+function vegJadroUzlu(rr, b, dny, ra, nt, smax, ro, vystup) {
+    const q = vystup || new Uint8Array(nt);
+    const s0 = VEG.SKLON[0], s1 = VEG.SKLON[1], s2 = VEG.SKLON[2], s3 = VEG.SKLON[3], s4 = VEG.SKLON[4], s5 = VEG.SKLON[5];
+    const kcMin = VEG.KC_MIN, kcRoz = VEG.KC_ROZ, ddf = VEG.DDF, lam = VEG.LAMBDA, kritS = VEG.KRIT * smax;
+    const o1 = nt, o2 = 2 * nt, o3 = 3 * nt, o4 = 4 * nt, o5 = 5 * nt;
+    let S = 0.6 * smax, snih = 0;
+    const pocet = Math.min(36, nt);
+    for (let i = 0; i < nt + pocet; i++) {          // prvních 36 kroků navíc = zahřátí zásobníku (bez zápisu)
+        const zapis = i >= pocet, t = zapis ? i - pocet : i;
+        const P = rr[t], B0 = b[t];
+        if (P !== P || B0 !== B0) { if (zapis) q[t] = 255; continue; }
+        const n = dny[t], Tp = B0 / n;
+        // teplota: součet sklon × stupňodny disjunktních pásem
+        const b2 = b[o1 + t], b4 = b[o2 + t], b6 = b[o3 + t], b8 = b[o4 + t], b10 = b[o5 + t];
+        let fT = (s0 * (B0 - b2) + s1 * (b2 - b4) + s2 * (b4 - b6) + s3 * (b6 - b8) + s4 * (b8 - b10) + s5 * b10) / n;
+        fT = fT < 0 ? 0 : (fT > 1 ? 1 : fT);
+        // sníh: podíl srážek jako sníh podle průměrné kladné teploty, tání stupňodny nad 0 °C
+        let fS = 1 - Tp / 3; fS = fS < 0 ? 0 : (fS > 1 ? 1 : fS);
+        snih += P * fS;
+        let tani = ddf * B0; if (tani > snih) tani = snih;
+        snih -= tani;
+        const voda = P * (1 - fS) + tani;
+        // povrchový odtok (dle půdy a nasycení), vsak do zásobníku, přebytek = spodní odtok
+        S += voda - voda * ro * (0.4 + 0.6 * S / smax);
+        if (S > smax) S = smax;
+        // výpar: Oudin (2005) × Kc podle teplotní fáze × útlum Ks (FAO-56)
+        const petc = (Tp > -5) ? n * ra[t % 36] / lam * (Tp + 5) / 100 * (kcMin + kcRoz * Math.sqrt(fT)) : 0;
+        const ks = S >= kritS ? 1 : S / kritS;
+        let aet = petc * ks; if (aet > S) aet = S;
+        S -= aet;
+        if (zapis) q[t] = Math.round(fT * (petc > 0.05 ? aet / petc : 1) * 254);
+    }
+    return q;
+}
+
+// ---------- cache a pomocné tabulky ----------
+const vegCache = new Map();
+let vegSigModelu = '', vegBuf = null, vegDoy = null, vegDnyRef = null;
+const vegRaCache = new Map();
+
+function vegRaRadek(lat) {
+    const klic = Math.round(lat * 100);
+    let z = vegRaCache.get(klic);
+    if (!z) {
+        if (!vegDoy) {
+            const dny = gslKlientskaPamet.dny; vegDnyRef = new Float32Array(36); vegDoy = new Float32Array(36);
+            let celk = 0; for (let d = 0; d < 36; d++) { vegDnyRef[d] = dny[d]; celk += dny[d]; }
+            let s = 0; for (let d = 0; d < 36; d++) { vegDoy[d] = (s + dny[d] / 2) / celk * 365; s += dny[d]; }
+        }
+        z = { ra: new Float32Array(36), ra0: new Float32Array(36) };
+        for (let d = 0; d < 36; d++) { z.ra[d] = vegRa(lat, vegDoy[d]); z.ra0[d] = vegRa(0, vegDoy[d]); }
+        vegRaCache.set(klic, z);
+    }
+    return z;
+}
+
+function vegNastaveni() {
+    const p = VEG.PUDY[document.getElementById('veg_puda')?.value] || VEG.PUDY.hlina;
+    const koreny = parseFloat(document.getElementById('veg_koreny')?.value || '1.5');
+    return { smax: p.awc * koreny, ro: p.ro, ref: document.getElementById('veg_ref')?.value || 'zeme' };
+}
+
+let vegMaskaRaw = null, vegMaskaVal = null;
+function vegMaskaDekad() {
+    const inp = document.querySelector('input.slider-hidden-input[name="vybrane_dekady"]');
+    const raw = inp ? inp.value : '';
+    if (raw === vegMaskaRaw && vegMaskaVal) return vegMaskaVal;
+    const m = new Uint8Array(36); let iv = [];
+    try { if (raw) iv = JSON.parse(raw); } catch (e) {}
+    if (!iv.length) m.fill(1);
+    else for (const i of iv) { const a = parseInt(i.od, 10), c = parseInt(i.do, 10); for (let d = a; d <= c; d++) if (d >= 1 && d <= 36) m[d - 1] = 1; }
+    vegMaskaRaw = raw; vegMaskaVal = m; return m;
+}
+
+function vegKontext() {
+    const nast = vegNastaveni();
+    const sigModelu = (document.getElementById('veg_puda')?.value || '') + '|' + (document.getElementById('veg_koreny')?.value || '');
+    if (sigModelu !== vegSigModelu) { vegCache.clear(); vegSigModelu = sigModelu; }
+    const mask = vegMaskaDekad(), nY = Math.floor(gslKlientskaPamet.nt / 36);
+    const trend = document.getElementById('trend_segment')?.value || 'NONE';
+    const kLet = trend === 'NONE' ? 0 : (trend === '0' ? Math.floor((nY - 1) / 2) : Math.floor(parseInt(trend, 10) / 2));
+    return { nast, mask, nY, kLet, sigAgg: nast.ref + '|' + mask.join('') + '|' + nY };
+}
+
+// roční hodnoty (%) + prefixové součty pro O(1) dotaz na okno let (trend)
+function vegRocni(z, u, kon) {
+    if (z.sigAgg === kon.sigAgg) return;
+    const nY = kon.nY, q = z.q, tab = vegRaRadek(u.lat), zeme = kon.nast.ref === 'zeme';
+    z.sumV = new Float32Array(nY + 1); z.sumC = new Uint16Array(nY + 1);
+    for (let y = 0; y < nY; y++) {
+        let num = 0, den = 0;
+        for (let d = 0; d < 36; d++) {
+            if (!kon.mask[d]) continue;
+            const v = q[y * 36 + d]; if (v === 255) continue;
+            if (zeme) { num += vegDnyRef[d] * tab.ra[d] * v; den += vegDnyRef[d] * tab.ra0[d] * 254; }
+            else      { num += vegDnyRef[d] * v;             den += vegDnyRef[d] * 254; }
+        }
+        const ok = den > 0;
+        z.sumV[y + 1] = z.sumV[y] + (ok ? 100 * num / den : 0);
+        z.sumC[y + 1] = z.sumC[y] + (ok ? 1 : 0);
+    }
+    z.sigAgg = kon.sigAgg;
+}
+
+function vegHodnotaUzlu(u, indexRoku, kon) {
+    const klic = u.row * 1024 + u.col;
+    let z = vegCache.get(klic);
+    if (!z) {
+        const db = gslKlientskaPamet, nt = db.nt;
+        if (!vegBuf || vegBuf.rr.length !== nt) vegBuf = { rr: new Float32Array(nt), b: new Float32Array(6 * nt) };
+        if (!db.naplnRady(u, vegBuf.rr, vegBuf.b)) return null;
+        const q = vegJadroUzlu(vegBuf.rr, vegBuf.b, db.dny, vegRaRadek(u.lat).ra, nt, kon.nast.smax, kon.nast.ro);
+        z = { q, sigAgg: '', sumV: null, sumC: null };
+        if (vegCache.size >= VEG.MAX_UZLU) { let i = 0; for (const k of vegCache.keys()) { vegCache.delete(k); if (++i > VEG.MAX_UZLU / 5) break; } }
+        vegCache.set(klic, z);
+    }
+    vegRocni(z, u, kon);
+    const a = Math.max(0, indexRoku - kon.kLet), c = Math.min(kon.nY - 1, indexRoku + kon.kLet);
+    if (c < a) return null;
+    const n = z.sumC[c + 1] - z.sumC[a];
+    return n > 0 ? (z.sumV[c + 1] - z.sumV[a]) / n : null;
+}
+
+// Kompatibilní můstek (dřívější název funkce)
+function získejHodnotuProVykresleni(u, indexRoku /*, params */) {
+    return vegHodnotaUzlu(u, indexRoku, vegKontext());
+}
+
+function vegZmenaModelu() {
+    vegCache.clear();
+    if (gslTileLayerLeaflet) gslTileLayerLeaflet.redraw();
+}
+
+// diagnostika v konzoli: vegDiagnostika(-3, -60) -> průměr za roky 2011-2040 a 2070-2099
+async function vegDiagnostika(lat, lon) {
+    const u = gslKlientskaPamet.uzel(lat, lon); if (!u) return console.warn('moře / mimo mřížku');
+    await gslKlientskaPamet.zajisti([u.tile]);
+    const out = {};
+    for (const ref of ['zeme', 'misto']) {
+        const nast = vegNastaveni(); nast.ref = ref;
+        const kon = { nast, mask: new Uint8Array(36).fill(1), nY: Math.floor(gslKlientskaPamet.nt / 36), kLet: 0, sigAgg: 'diag' + ref };
+        const z = { q: null }; vegCache.delete(u.row * 1024 + u.col);
+        const h = [2011, 2040, 2070, 2099].map(r => { const v = vegHodnotaUzlu(u, r - START_ROK_TAS, kon); return v == null ? null : Math.round(v * 10) / 10; });
+        out[ref] = h;
+    }
+    vegCache.delete(u.row * 1024 + u.col);
+    console.table(out); return out;
+}
+
+// ---------- barvy legendy ----------
+function vegHslNaRgb(hsl) {
+    const m = hsl.match(/hsl\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%/); if (!m) return [128, 128, 128];
+    const h = +m[1] / 360, s = +m[2] / 100, l = +m[3] / 100;
+    const f = n => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); };
+    return [f(0), f(8), f(4)];
+}
+
+// =============================================================================
+// 5. MAPA: vegetace / BEDD / srážky / BEDD + srážky (společné jádro vykreslení)
+// -----------------------------------------------------------------------------
+// Měřítka (shodná v mapě i v grafu):
+//   srážky = průměrný MĚSÍČNÍ úhrn (mm) přes vybrané dekády  (součet RR / součet dní × 30,4)
+//   BEDD   = průměr za DEKÁDU (°C·dní) ve vybraných teplotních pásmech (hladiny ze slideru)
+//   Pásma jsou disjunktní: 0–2, 2–4, 4–6, 6–8, 8–10 °C a nad 10 °C (rozdíly sousedních hladin),
+//   takže při výběru všech hladin je součet pásem přesně BEDD 0 °C.
+// =============================================================================
+const GSL_HLADINY = ["0°C", "2°C", "4°C", "6°C", "8°C", "10°C"];
+//const otoc = .reverse();
+const GSL_HUE_HLADIN = [264, 234, 104, 74, 44, 14];          // odstín 0 °C … 10 °C (stejně jako legenda BEDD)
+const GSL_BEDD_MEZE = [20, 50, 70, 90, 140];                 // třídy BEDD (na dekádu)
+const GSL_BEDD_HUE = [14, 44, 74, 104, 234, 264];
+const GSL_SRAZKY_MEZE_SAMOSTATNE = [20, 50, 90, 140];
+// Kombinace BEDD + srážky: odstín = třída BEDD, světlost a sytost = třída srážek.
+// Suché = světlé a bledé, vlhké = tmavé a sytě barevné. Hodnoty lze ladit (světlost nechte nad ~28 %,
+// jinak se odstíny BEDD ve tmě přestanou rozlišovat).
+const GSL_KOMBI_MEZE = [20, 50, 90, 140];                       // hranice tříd srážek (mm/měsíc)
+const GSL_KOMBI_S = [45, 60, 75, 88, 98];                       // sytost v % pro 5 tříd srážek
+const GSL_KOMBI_L = [76, 62, 50, 40, 30];                       // světlost v % pro 5 tříd srážek
+const GSL_KOMBI_POPIS = ["< 20 mm", "20–50 mm", "50–90 mm", "90–140 mm", "> 140 mm"];
+const GSL_BEDD_POPIS = ["< 20", "20–50", "50–70", "70–90", "90–140", "> 140"];   // °C·dní na dekádu
+
+const gslSliderCache = {};
+function gslCtiInterval(name) {
+    const inp = document.querySelector(`input.slider-hidden-input[name="${name}"]`);
+    const raw = inp ? inp.value : '';
+    const c = gslSliderCache[name];
+    if (c && c.raw === raw) return c.val;
+    let val = []; try { if (raw) val = JSON.parse(raw); } catch (e) {}
+    gslSliderCache[name] = { raw, val };
+    return val;
+}
+
+// Jediné místo, kde se čtou posuvníky a zaškrtávátka (mapa, graf, tabulky, export)
+function gslVyber() {
+    const nY = Math.floor(gslKlientskaPamet.nt / 36);
+    const pasma = new Uint8Array(6), ih = gslCtiInterval('vybrane_hladiny');
+    if (!ih.length) pasma.fill(1);
+    else for (const i of ih) {
+        const a = GSL_HLADINY.indexOf(i.od), b = GSL_HLADINY.indexOf(i.do);
+        for (let k = Math.max(0, a); k <= b; k++) pasma[k] = 1;
+    }
+    const ir = gslCtiInterval('vybrane_roky'), posl = START_ROK_TAS + nY - 1;
+    let roky = ir.map(i => ({ od: Math.max(START_ROK_TAS, +i.od), do: Math.min(posl, +i.do) })).filter(r => r.do >= r.od).sort((a, b) => a.od - b.od);
+    if (!roky.length) roky = [{ od: START_ROK_TAS, do: posl }];
+    const bdd = !!document.getElementById('bdd')?.checked, srazky = !!document.getElementById('srazky')?.checked;
+    const veg = !!document.getElementById('vegetace')?.checked;
+    const rezim = veg ? 'veg' : (bdd && srazky ? 'oboje' : bdd ? 'bdd' : srazky ? 'srazky' : 'zadny');
+    const dek = gslCtiInterval('vybrane_dekady');
+    return { nY, mask: vegMaskaDekad(), pasma, roky, rezim, dek, hladinyInt: ih,
+             trend: document.getElementById('trend_segment')?.value || 'NONE' };
+}
+
+function gslHsl(h, s, l) {
+    s /= 100; l /= 100; h /= 30;
+    const a = s * Math.min(l, 1 - l), f = n => { const k = (n + h) % 12; return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); };
+    return [f(0), f(8), f(4)];
+}
+
+// roční hodnoty obou kanálů mapy z jedné řady uzlu (NaN = nic platného)
+function gslRocniKanaly(serie, vyb, chRR, chBDD) {
+    const nt = serie.nt, nY = vyb.nY, dny = gslKlientskaPamet.dny, rr = serie.rr, b = serie.b, mask = vyb.mask, pasma = vyb.pasma;
+    const oRR = chRR ? new Float32Array(nY) : null, oB = chBDD ? new Float32Array(nY) : null;
+    for (let y = 0; y < nY; y++) {
+        let sP = 0, sN = 0, sB = 0, cB = 0;
+        for (let d = 0; d < 36; d++) {
+            if (!mask[d]) continue;
+            const t = y * 36 + d;
+            if (chRR) { const r = rr[t]; if (r === r) { sP += r; sN += dny[t]; } }
+            if (chBDD) {
+                const b0 = b[t];
+                if (b0 === b0) {
+                    let v = 0;
+                    for (let k = 0; k < 5; k++) if (pasma[k]) v += b[k * nt + t] - b[(k + 1) * nt + t];
+                    if (pasma[5]) v += b[5 * nt + t];
+                    sB += v; cB++;
+                }
+            }
+        }
+        if (chRR) oRR[y] = sN > 0 ? sP / sN * 30.4 : NaN;
+        if (chBDD) oB[y] = cB > 0 ? sB / cB : NaN;
+    }
+    return { rr: oRR, bdd: oB };
+}
+
+function gslPrefix(a) {
+    const n = a.length, sumV = new Float32Array(n + 1), sumC = new Uint16Array(n + 1);
+    for (let i = 0; i < n; i++) { const ok = a[i] === a[i]; sumV[i + 1] = sumV[i] + (ok ? a[i] : 0); sumC[i + 1] = sumC[i] + (ok ? 1 : 0); }
+    return { sumV, sumC };
+}
+function gslOkno(p, idx, kLet, nY) {
+    if (!p) return null;
+    const a = Math.max(0, idx - kLet), c = Math.min(nY - 1, idx + kLet);
+    if (c < a) return null;
+    const n = p.sumC[c + 1] - p.sumC[a];
+    return n > 0 ? (p.sumV[c + 1] - p.sumV[a]) / n : null;
+}
+
+const gslMapCache = new Map();
+function gslMapKontext() {
+    const vyb = gslVyber(), vk = vegKontext();
+    const rr = vyb.rezim === 'srazky' || vyb.rezim === 'oboje', bd = vyb.rezim === 'bdd' || vyb.rezim === 'oboje';
+    return { vyb, vk, nY: vyb.nY, kLet: vk.kLet, rr, bd, sig: [vyb.rezim, vyb.mask.join(''), vyb.pasma.join(''), vyb.nY].join('|') };
+}
+function gslMapZaznam(u, kon) {
+    const klic = u.row * 1024 + u.col;
+    let z = gslMapCache.get(klic);
+    if (z && z.sig === kon.sig) return z;
+    const db = gslKlientskaPamet, nt = db.nt;
+    if (!vegBuf || vegBuf.rr.length !== nt) vegBuf = { rr: new Float32Array(nt), b: new Float32Array(6 * nt) };
+    if (!db.naplnRady(u, vegBuf.rr, vegBuf.b)) return null;
+    const r = gslRocniKanaly({ nt, rr: vegBuf.rr, b: vegBuf.b }, kon.vyb, kon.rr, kon.bd);
+    z = { sig: kon.sig, rr: r.rr ? gslPrefix(r.rr) : null, bdd: r.bdd ? gslPrefix(r.bdd) : null };
+    if (gslMapCache.size >= VEG.MAX_UZLU) { let i = 0; for (const k of gslMapCache.keys()) { gslMapCache.delete(k); if (++i > VEG.MAX_UZLU / 5) break; } }
+    gslMapCache.set(klic, z);
+    return z;
+}
+
+function gslTrida(val, meze) { let c = 0; while (c < meze.length && val >= meze[c]) c++; return c; }
+
+function gslLegendaHtml(polozky, sirka) {
+    return polozky.map(l => `<div style="max-width: ${sirka || 70}px; min-width: 50px; text-align: center; margin: 2px; display:inline-block;"><div style="width:20px; height:15px; background:${l.barva}; margin:5px auto; border:1px solid #aaa;"></div><span>${l.t}</span></div>`).join('');
+}
+
+// Jedna funkce pro všechny režimy: sestaví legendu a funkci barvy uzlu, pak přidá rastrovou vrstvu
+function prekresliGslMapu() {
+    const zobraz = document.getElementById("zobrazit")?.checked || false;
+    const casovyPanel = document.getElementById("gsl_casovy_panel");
+    const legPanel = document.getElementById("mapa-legenda");
+    const legBarvy = document.getElementById("legenda-barvy");
+    const titulek = document.getElementById("legenda-titulek");
+
+    if (gslTileLayerLeaflet) { map.removeLayer(gslTileLayerLeaflet); gslTileLayerLeaflet = null; }
+    if (legBarvy) legBarvy.innerHTML = "";
+    const rezim = gslVyber().rezim;
+    if (!zobraz || rezim === 'zadny') {
+        if (casovyPanel) casovyPanel.style.display = "none";
+        if (legPanel) legPanel.style.display = "none";
+        return;
+    }
+    if (casovyPanel) casovyPanel.style.display = "block";
+    if (legPanel) legPanel.style.display = "block";
+
+    let barvaUzlu;                       // (u, indexRoku, kon) -> [r,g,b] | null
+    const bddLeg = [
+        { barva: "hsl(14, 74%, 34%)",  t: "< 20" }, { barva: "hsl(44, 74%, 34%)",  t: "20 - 50" },
+        { barva: "hsl(74, 74%, 34%)",  t: "50 - 70" },  { barva: "hsl(104, 74%, 34%)", t: "70 - 90" },
+        { barva: "hsl(234, 74%, 34%)", t: "90 - 140" },  { barva: "hsl(264, 74%, 34%)", t: "> 140" }];
+
+    if (rezim === 'veg') {
+        const misto = document.getElementById("veg_ref")?.value === "misto";
+        titulek.innerText = "Odhadovaný vegetační růst v procentech " + (misto ? "potenciálu lokality (voda × teplo)" : "maxima Země (vlhké tropy)");
+        const meze = [10, 20, 40, 60, 80], barvy = ["hsl(90, 50%, 100%)", "hsl(90, 50%, 70%)", "hsl(97, 62%, 60%)", "hsl(104, 74%, 45%)", "hsl(111, 86%, 35%)", "hsl(118, 98%, 20%)"];
+        const txt = ["0 - 10", "10 - 20", "20 - 40", "40 - 60", "60 - 80", "80 - 100"];
+        legBarvy.innerHTML = gslLegendaHtml(barvy.map((b, i) => ({ barva: b, t: txt[i] })), 60);
+        const rgb = barvy.map(b => { const m = b.match(/hsl\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%/); return gslHsl(+m[1], +m[2], +m[3]); });
+        barvaUzlu = (u, idx, kon) => { const v = vegHodnotaUzlu(u, idx, kon.vk); return v === null || v !== v ? null : rgb[gslTrida(v, meze)]; };
+    } else if (rezim === 'srazky') {
+        titulek.innerText = "Legenda: Průměrný měsíční srážkový úhrn ve vybraných dekádách";
+        const sl = [
+            { barva: "hsl(90, 40%, 95%)",  t: "Kritické sucho / Deficit <br>(< 20 mm)" },
+            { barva: "hsl(97, 62%, 65%)",  t: "Slabé srážky / Podnormál <br>(20 - 50 mm)" },
+            { barva: "hsl(104, 74%, 50%)", t: "Optimální závlaha plodin <br>(50 - 90 mm)" },
+            { barva: "hsl(111, 86%, 35%)", t: "Vysoká vláha / Nasycení <br>(90 - 140 mm)" },
+            { barva: "hsl(118, 98%, 20%)", t: "Přívalové srážky / Riziko eroze <br>(> 140 mm)" }];
+        legBarvy.innerHTML = gslLegendaHtml(sl);
+        const rgb = [[90, 40, 95], [97, 62, 65], [104, 74, 50], [111, 86, 35], [118, 98, 20]].map(a => gslHsl(...a));
+        barvaUzlu = (u, idx, kon) => {
+            const z = gslMapZaznam(u, kon); if (!z) return null;
+            const v = gslOkno(z.rr, idx, kon.kLet, kon.nY); return v === null ? null : rgb[gslTrida(v, GSL_SRAZKY_MEZE_SAMOSTATNE)];
+        };
+    } else if (rezim === 'bdd') {
+        titulek.innerText = "Legenda: BEDD – Ø suma teplot na dekádu (°C·dní) ve vybraných teplotních pásmech";
+        legBarvy.innerHTML = gslLegendaHtml(bddLeg);
+        const rgb = GSL_BEDD_HUE.map(h => gslHsl(h, 74, 34));
+        barvaUzlu = (u, idx, kon) => {
+            const z = gslMapZaznam(u, kon); if (!z) return null;
+            const v = gslOkno(z.bdd, idx, kon.kLet, kon.nY); return v === null ? null : rgb[gslTrida(v, GSL_BEDD_MEZE)];
+        };
+    } else {   // oboje: odstín dává BEDD, světlost a sytost srážky
+        titulek.innerText = "Legenda: odstín = BEDD (°C·dní na dekádu), světlost a sytost = srážky (mm za měsíc)";
+        // matice: sloupce = třídy BEDD, řádky = třídy srážek
+        let h = `<div style="display:grid; grid-template-columns: 72px repeat(6, 46px); gap:2px; align-items:center; font-size:11px; margin:auto;"><div></div>` +
+            GSL_BEDD_POPIS.map(t => `<div style="text-align:center;">${t}</div>`).join('');
+        for (let p = 0; p < 5; p++) {
+            h += `<div style="text-align:right; padding-right:4px;">${GSL_KOMBI_POPIS[p]}</div>` +
+                 GSL_BEDD_HUE.map(hue => `<div style="height:18px; border:1px solid #aaa; background:hsl(${hue}, ${GSL_KOMBI_S[p]}%, ${GSL_KOMBI_L[p]}%);"></div>`).join('');
+        }
+        legBarvy.innerHTML = h + `</div><div style="width:100%; font-size:12px; font-weight:bold; color: rgb(68, 68, 68); margin-top:4px;">Vodorovně poznáte teplo (BEDD), svisle srážky: čím sušší, tím světlejší a bledší barva.</div>`;
+        const rgb = GSL_BEDD_HUE.map(hh => GSL_KOMBI_S.map((s, i) => gslHsl(hh, s, GSL_KOMBI_L[i])));
+        barvaUzlu = (u, idx, kon) => {
+            const z = gslMapZaznam(u, kon); if (!z) return null;
+            const bb = gslOkno(z.bdd, idx, kon.kLet, kon.nY), p = gslOkno(z.rr, idx, kon.kLet, kon.nY);
+            if (bb === null || p === null) return null;
+            return rgb[gslTrida(bb, GSL_BEDD_MEZE)][gslTrida(p, GSL_KOMBI_MEZE)];
+        };
+    }
+
+    gslTileLayerLeaflet = L.gridLayer({ tileSize: 256, opacity: rezim === 'veg' ? 0.55 : (rezim === 'oboje' ? 0.7 : 0.5), keepBuffer: 2, updateWhenIdle: false });
+    const KROK = 16, N = 18;                                   // 16 buněk + okraj 1 buňka z každé strany
+    const male = document.createElement('canvas'); male.width = male.height = N;
+    const mctx = male.getContext('2d');
+
+    gslTileLayerLeaflet.createTile = function(coords, done) {
+        const tile = L.DomUtil.create('canvas', 'leaflet-tile');
+        tile.width = tile.height = 256;
+        const ctx = tile.getContext('2d');
+        const indexRoku = parseInt(document.getElementById("gsl_rok_slider")?.value || "2011", 10) - START_ROK_TAS;
+        const sv = 256 * Math.pow(2, coords.z), uzly = new Array(N * N), ids = new Set();
+        for (let j = 0; j < N; j++) {
+            const py = coords.y * 256 + (j - 1) * KROK + KROK / 2;
+            const lat = 180 / Math.PI * Math.atan(Math.sinh(Math.PI - 2 * Math.PI * py / sv));
+            for (let i = 0; i < N; i++) {
+                const px = coords.x * 256 + (i - 1) * KROK + KROK / 2;
+                const u = gslKlientskaPamet.uzel(lat, px / sv * 360 - 180);
+                uzly[j * N + i] = u; if (u) ids.add(u.tile);
+            }
+        }
+        gslKlientskaPamet.zajisti(Array.from(ids)).then(() => {
+            const kon = gslMapKontext();
+            const img = mctx.createImageData(N, N), px = img.data, hodnoty = new Map();
+            for (let k = 0; k < N * N; k++) {
+                const u = uzly[k]; if (!u) continue;
+                const klic = u.row * 1024 + u.col;
+                let rgb = hodnoty.get(klic);
+                if (rgb === undefined) { rgb = barvaUzlu(u, indexRoku, kon); hodnoty.set(klic, rgb); }
+                if (!rgb) continue;
+                const o = k * 4; px[o] = rgb[0]; px[o + 1] = rgb[1]; px[o + 2] = rgb[2]; px[o + 3] = 255;
+            }
+            mctx.putImageData(img, 0, 0);
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(male, 0, 0, N, N, -KROK, -KROK, N * KROK, N * KROK);
+            done(null, tile);
+        }).catch(err => done(err, tile));
+        return tile;
+    };
+    gslTileLayerLeaflet.addTo(map);
+}
+
+
+
+// =============================================================================
+// 6. ZPRACOVÁNÍ DAT UZLU (společné pro graf, tabulky a export)
+// =============================================================================
+let GSL_VYPIS = null;
+const GSL_MAX_ROKU_DEKADY = 5;     // výběr do tohoto počtu let se v grafu kreslí po dekádách, větší po letech
+
+function gslPopisRozsahu(iv, jednotka) {
+    return iv.map(r => r.od === r.do ? `${r.od}` : `${r.od}–${r.do}`).join(', ');
+}
+function gslPopisDekad(vyb) {
+    const iv = vyb.dek;
+    return iv.length ? iv.map(i => i.od === i.do ? i.od : `${i.od}–${i.do}`).join(', ') : '1–36';
+}
+function gslPopisHladin(vyb) {
+    const iv = vyb.hladinyInt;
+    return iv.length ? iv.map(i => i.od === i.do ? i.od : `${i.od}–${i.do}`).join(', ') : '0°C–10°C';
+}
+
+// Jedno projití vybraných let a dekád. Výsledek: roční souhrny + řádky po dekádách.
+function gslZpracujUzel(u, lat, lon, serie, vyb) {
+    const db = gslKlientskaPamet, nt = serie.nt, dny = db.dny, rr = serie.rr, b = serie.b;
+    const nast = vegNastaveni();
+    const ra = vegRaRadek(u.lat);
+    const q = vegJadroUzlu(rr, b, dny, ra.ra, nt, nast.smax, nast.ro);
+    const zeme = nast.ref === 'zeme';
+    const roky = [];                    // jeden záznam na vybraný rok
+    const radky = [];                   // jeden záznam na vybranou dekádu
+    vyb.roky.forEach((r, seg) => {
+        for (let rok = r.od; rok <= r.do; rok++) {
+            const y = rok - START_ROK_TAS;
+            const z = { rok, y, seg, cnt: 0, dny: 0, P: 0, PET: 0, B: new Float64Array(6), sezona: 0,
+                        vNumZ: 0, vDenZ: 0, vNumM: 0, vDenM: 0 };
+            for (let d = 0; d < 36; d++) {
+                if (!vyb.mask[d]) continue;
+                const t = y * 36 + d, P = rr[t], b0 = b[t];
+                if (P !== P || b0 !== b0) continue;
+                const n = dny[t], Tp = b0 / n;
+                const pet = Tp > -5 ? n * ra.ra[d] / VEG.LAMBDA * (Tp + 5) / 100 : 0;
+                const bn = [b0, b[nt + t], b[2 * nt + t], b[3 * nt + t], b[4 * nt + t], b[5 * nt + t]];
+                z.cnt++; z.dny += n; z.P += P; z.PET += pet;
+                for (let k = 0; k < 6; k++) z.B[k] += bn[k];
+                if (Tp >= 5) z.sezona += n;
+                const v = q[t];
+                if (v !== 255) {
+                    z.vNumZ += n * ra.ra[d] * v; z.vDenZ += n * ra.ra0[d] * 254;
+                    z.vNumM += n * v;            z.vDenM += n * 254;
+                }
+                radky.push({ rok, seg, dek: d + 1, dny: n, P, pet, b: bn,
+                             vegM: v === 255 ? NaN : v / 254 * 100,
+                             vegZ: v === 255 ? NaN : v / 254 * ra.ra[d] / ra.ra0[d] * 100 });
+            }
+            z.ok = z.cnt > 0;
+            z.PM = z.ok ? z.P / z.dny * 30.4 : NaN;                         // Ø měsíční úhrn, mm
+            z.bil = z.ok ? z.P - z.PET : NaN;
+            z.Bsel = new Float64Array(6);                                   // BEDD v pásmech: Ø na dekádu
+            for (let k = 0; k < 6; k++) z.Bsel[k] = z.ok ? (z.B[k] - (k < 5 ? z.B[k + 1] : 0)) / z.cnt : NaN;
+            z.Bvyb = 0; for (let k = 0; k < 6; k++) if (vyb.pasma[k]) z.Bvyb += z.Bsel[k];
+            z.Bnest = z.B.map(v => z.ok ? v / z.cnt : NaN);                 // vnořené hladiny: Ø na dekádu
+            z.BvybSuma = 0; for (let k = 0; k < 6; k++) if (vyb.pasma[k]) z.BvybSuma += z.B[k] - (k < 5 ? z.B[k + 1] : 0);
+            z.veg = zeme ? (z.vDenZ > 0 ? 100 * z.vNumZ / z.vDenZ : NaN) : (z.vDenM > 0 ? 100 * z.vNumM / z.vDenM : NaN);
+            roky.push(z);
+        }
+    });
+    return { lat, lon, u, vyb, nast, roky, radky, zeme, adresa: '' };
+}
+
+// =============================================================================
+// 7. GRAF S VÍCE ROZSAHY LET (osa X ze zvolených rozsahů, osa Y podle zobrazených dat)
+// =============================================================================
+async function nactiGslHistoriiProGraf(lat, lon) {
+    const metaGsl = document.getElementById("gsl-meta-info");
+    const canvasGsl = document.getElementById("gslGraf");
+    metaGsl.innerHTML = "<i>Zpracovávám data pro graf...</i>";
+    if (canvasGsl) canvasGsl.style.display = "none";
+    if (aktualniMarker) map.removeLayer(aktualniMarker);
+    aktualniMarker = L.marker([lat, lon]).addTo(map);
+    try {
+        const u = gslKlientskaPamet.uzel(lat, lon);
+        if (!u) throw new Error("Zvolené souřadnice leží mimo pevninu nebo mřížku databáze.");
+        await gslKlientskaPamet.zajisti([u.tile]);
+        const db = gslKlientskaPamet, nt = db.nt;
+        const serie = { nt, rr: new Float32Array(nt), b: new Float32Array(6 * nt) };
+        if (!db.naplnRady(u, serie.rr, serie.b)) throw new Error("Pro danou lokalitu se nepodařilo načíst data.");
+        const vyb = gslVyber();
+        if (vyb.rezim === 'zadny') { metaGsl.innerHTML = "Zaškrtněte BEDD, srážky nebo dobu vegetace."; return; }
+        const D = gslZpracujUzel(u, lat, lon, serie, vyb);
+        GSL_VYPIS = D;
+        kresliGslGraf(canvasGsl, D);
+        metaGsl.innerHTML = `Kliknutím na graf ho zvětšíte a obráceně. <br> <span style="text-decoration: underline; color: blue; cursor: pointer;" onclick="otevriVypis()">Zobraz výpis v tabulce</span>`;
+        nactiGeografickeUdaje(lat, lon).then(misto => {
+            D.adresa = misto;
+            const g = document.getElementById("geo"); if (g) g.innerHTML = gslNadpisLokality(D);
+        }).catch(() => {});
+    } catch (err) {
+        metaGsl.innerHTML = `<span style="color:#d32f2f;">Projekční graf: ${err.message}</span>`;
+    }
+}
+
+function gslNadpisLokality(D) {
+    return `Lokalita: lat ${D.lat}, lon ${D.lon}` + (D.adresa ? ` – ${D.adresa}` : '');
+}
+
+function kresliGslGraf(canvas, D) {
+    canvas.style.display = "block";
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const vyb = D.vyb, rezim = vyb.rezim;
+    const pocetLet = vyb.roky.reduce((s, r) => s + r.do - r.od + 1, 0);
+    const poDekadach = pocetLet <= GSL_MAX_ROKU_DEKADY;
+    const dekNaRok = Math.max(1, vyb.mask.reduce((s, v) => s + v, 0));
+    // jednotné "body" grafu: buď roční souhrny, nebo jednotlivé vybrané dekády
+    const roky = poDekadach
+        ? D.radky.map(r => ({ rok: r.rok, dek: r.dek, seg: r.seg, PM: r.P / r.dny * 30.4, veg: D.zeme ? r.vegZ : r.vegM,
+                              Bsel: r.b.map((v, k) => k < 5 ? v - r.b[k + 1] : v), Bnest: r.b }))
+        : D.roky.map(z => ({ rok: z.rok, dek: 0, seg: z.seg, PM: z.PM, veg: z.veg, Bsel: Array.from(z.Bsel), Bnest: Array.from(z.Bnest) }));
+    const stackBdd = rezim === 'bdd' || rezim === 'oboje';
+    const rightAxis = rezim === 'oboje';
+    const padLeft = 100, padRight = rightAxis ? 100 : 60, padTop = 90, padBottom = 80, GAP = 30;
+    const gW = canvas.width - padLeft - padRight, gH = canvas.height - padTop - padBottom;
+    const N = roky.length, nSeg = vyb.roky.length;
+    const usable = gW - (nSeg - 1) * GAP;
+    const X = i => padLeft + (N > 1 ? i / (N - 1) : 0.5) * usable + roky[i].seg * GAP;
+
+    // --- hodnoty podle režimu ---
+    const lineVals = roky.map(z => rezim === 'veg' ? z.veg : z.PM);          // hlavní křivka (veg/srážky)
+    const bandVals = roky.map(z => Array.from(z.Bsel));                       // pásma BEDD
+    const selBands = [0, 1, 2, 3, 4, 5].filter(k => vyb.pasma[k]);
+    // trend: nejvyšší vybraná hladina s nenulovou hodnotou (vnořená BEDD hladina)
+    let trendHladina = -1;
+    for (const k of selBands) if (roky.some(z => z.Bnest[k] > 0)) trendHladina = k;
+    const trendVals = roky.map(z => rezim === 'veg' || rezim === 'srazky' ? lineVals[roky.indexOf(z)] : (trendHladina >= 0 ? z.Bnest[trendHladina] : NaN));
+
+    // --- osy Y ---
+    function rozsah(arr, odNuly) {
+        let mn = Infinity, mx = -Infinity;
+        arr.forEach(v => { if (v === v && v !== null) { if (v < mn) mn = v; if (v > mx) mx = v; } });
+        if (!isFinite(mn)) { mn = 0; mx = 1; }
+        const pad = Math.max((mx - mn) * 0.08, 0.5);
+        mn = odNuly ? 0 : Math.max(0, mn - pad); mx = mx + pad;
+        return [mn, mx];
+    }
+    let yL, yR = null, popisL, popisR = '';
+    if (stackBdd) {
+        const celk = roky.map((z, i) => selBands.reduce((s, k) => s + (z.Bsel[k] || 0), 0));
+        yL = rozsah(celk.concat(trendVals), true); popisL = ' °C·dní/dek.';
+        if (rightAxis) { yR = rozsah(lineVals, false); popisR = ' mm/měs.'; }
+    } else if (rezim === 'veg') { yL = rozsah(lineVals, false); yL[1] = Math.min(100, yL[1]); popisL = ' %'; }
+    else { yL = rozsah(lineVals, false); popisL = ' mm/měs.'; }
+    const yPos = (v, os) => padTop + gH - ((v - os[0]) / ((os[1] - os[0]) || 1)) * gH;
+
+    // --- mřížka Y ---
+    ctx.font = "14px sans-serif"; ctx.textBaseline = "middle";
+    for (let i = 0; i <= 10; i++) {
+        const vL = yL[0] + (yL[1] - yL[0]) * i / 10, y = yPos(vL, yL);
+        ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(padLeft, y); ctx.lineTo(padLeft + gW, y); ctx.stroke();
+        ctx.textAlign = "right"; ctx.fillStyle = "#555"; ctx.fillText(vL.toFixed(vL < 10 ? 1 : 0) + popisL, padLeft - 12, y);
+        if (yR) { const vR = yR[0] + (yR[1] - yR[0]) * i / 10; ctx.textAlign = "left"; ctx.fillStyle = "#000"; ctx.fillText(vR.toFixed(0) + popisR, padLeft + gW + 12, y); }
+    }
+
+    // --- osa X: roky (silně, níž), dekády / měsíce (nahoře), zlomy mezi rozsahy ---
+    const sirka = usable / ((N - 1) || 1);
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    const mesNaz = ["Led", "Úno", "Bře", "Dub", "Kvě", "Čer", "Čec", "Srp", "Zář", "Říj", "Lis", "Pro"];
+    const cara = (x, barva, w) => { ctx.strokeStyle = barva; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x, padTop); ctx.lineTo(x, padTop + gH); ctx.stroke(); };
+    const zacRoku = i => i === 0 || roky[i - 1].rok !== roky[i].rok || roky[i - 1].seg !== roky[i].seg;
+    if (poDekadach) {
+        roky.forEach((z, i) => {
+            const x = X(i);
+            cara(x, zacRoku(i) ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.15)", zacRoku(i) ? 1.6 : 0.8);
+            ctx.fillStyle = "#555"; ctx.font = "11px sans-serif";
+            if (sirka >= 20) ctx.fillText(String(z.dek), x, padTop + gH + 6);                          // číslo dekády
+            else if (z.dek % 3 === 1 && sirka * 3 >= 30) ctx.fillText(mesNaz[Math.floor((z.dek - 1) / 3)], x, padTop + gH + 6);   // začátek měsíce
+        });
+        // rok vystředěný pod svými dekádami
+        let i = 0;
+        while (i < N) {
+            let j = i; while (j + 1 < N && !zacRoku(j + 1)) j++;
+            ctx.fillStyle = "#000"; ctx.font = "bold 13px sans-serif";
+            ctx.fillText(roky[i].rok, (X(i) + X(j)) / 2, padTop + gH + 30);
+            i = j + 1;
+        }
+    } else {
+        const tučné = new Array(N).fill(false), obsazeno = [];
+        roky.forEach((z, i) => {                                       // 1. průchod: začátky a konce rozsahů
+            const kon = i === N - 1 || roky[i + 1].seg !== z.seg;
+            if (zacRoku(i) || kon) { tučné[i] = true; obsazeno.push(X(i)); }
+        });
+        roky.forEach((z, i) => {                                       // 2. průchod: roky dělitelné deseti, pokud se nepřekrývají
+            if (!tučné[i] && z.rok % 10 === 0 && obsazeno.every(ox => Math.abs(ox - X(i)) >= 38)) { tučné[i] = true; obsazeno.push(X(i)); }
+        });
+        const krokMale = Math.max(1, Math.ceil(20 / (sirka || 1)));
+        let posledniMaly = -1e9;
+        roky.forEach((z, i) => {
+            const x = X(i), kon = i === N - 1 || roky[i + 1].seg !== z.seg;
+            cara(x, (z.rok % 10 === 0 || zacRoku(i) || kon) ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.12)", z.rok % 10 === 0 ? 1.4 : 0.8);
+            if (tučné[i]) { ctx.fillStyle = "#000"; ctx.font = "bold 13px sans-serif"; ctx.fillText(z.rok, x, padTop + gH + 30); }
+            else if (z.rok % krokMale === 0 && x - posledniMaly >= 18) {
+                ctx.fillStyle = "#555"; ctx.font = "12px sans-serif"; ctx.fillText(String(z.rok).slice(2), x, padTop + gH + 12); posledniMaly = x;
+            }
+        });
+    }
+    for (let s = 1; s < nSeg; s++) {                                     // zlom osy mezi rozsahy
+        const iPrvni = roky.findIndex(z => z.seg === s), xz = (X(iPrvni - 1) + X(iPrvni)) / 2;
+        ctx.fillStyle = "rgba(120,120,120,0.12)"; ctx.fillRect(X(iPrvni - 1), padTop, X(iPrvni) - X(iPrvni - 1), gH);
+        ctx.strokeStyle = "#444"; ctx.lineWidth = 2;
+        for (const dx of [-4, 4]) { ctx.beginPath(); ctx.moveTo(xz + dx - 3, padTop + gH + 6); ctx.lineTo(xz + dx + 3, padTop + gH - 6); ctx.stroke(); }
+    }
+
+    // pomocné: kreslení po souvislých úsecích (zlomy a chybějící hodnoty přeruší křivku)
+    function useky(vals) {
+        const out = []; let cur = [];
+        vals.forEach((v, i) => {
+            if (v === v && v !== null && (cur.length === 0 || roky[cur[cur.length - 1]].seg === roky[i].seg)) cur.push(i);
+            else { if (cur.length) out.push(cur); cur = (v === v && v !== null) ? [i] : []; }
+        });
+        if (cur.length) out.push(cur);
+        return out;
+    }
+    function caraPoUsecich(vals, os, barva, sirkaCary, tecky) {
+        ctx.strokeStyle = barva; ctx.lineWidth = sirkaCary; ctx.setLineDash(tecky || []);
+        useky(vals).forEach(us => {
+            ctx.beginPath(); us.forEach((i, j) => { const x = X(i), y = yPos(vals[i], os); j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+            if (us.length === 1) { ctx.fillStyle = barva; ctx.beginPath(); ctx.arc(X(us[0]), yPos(vals[us[0]], os), 3, 0, 6.3); ctx.fill(); }
+        });
+        ctx.setLineDash([]);
+    }
+    // kluzavý trend zvlášť v každém rozsahu (nepřechází přes zlom osy)
+    function trendPoUsecich(vals) {
+        const k = vyb.trend === 'NONE' ? -1 : vyb.trend === '0' ? Infinity : Math.floor(parseInt(vyb.trend, 10) * (poDekadach ? dekNaRok : 1) / 2);
+        if (k < 0) return null;
+        const out = new Array(vals.length).fill(NaN);
+        for (let s = 0; s < nSeg; s++) {
+            const idx = roky.map((z, i) => z.seg === s ? i : -1).filter(i => i >= 0);
+            const kk = k === Infinity ? Math.floor(idx.length / 2) : k;
+            idx.forEach((i, p) => {
+                let sum = 0, c = 0;
+                for (let j = Math.max(0, p - kk); j <= Math.min(idx.length - 1, p + kk); j++) { const v = vals[idx[j]]; if (v === v && v !== null) { sum += v; c++; } }
+                if (c) out[i] = sum / c;
+            });
+        }
+        return out;
+    }
+
+    // --- BEDD: skládané plochy pásem (od 0 °C nahoru), pásma s nulou zanikají ---
+    const legenda = [];
+    if (stackBdd) {
+        let spodek = new Array(N).fill(0);
+        for (const k of selBands) {
+            const vrch = spodek.map((s, i) => s + (bandVals[i][k] || 0));
+            const barva = `hsl(${GSL_HUE_HLADIN[k]}, 74%, 40%)`;
+            useky(vrch.map((v, i) => i >= 0 ? v : NaN)).forEach(us => {
+                ctx.beginPath();
+                us.forEach((i, j) => j ? ctx.lineTo(X(i), yPos(vrch[i], yL)) : ctx.moveTo(X(i), yPos(vrch[i], yL)));
+                for (let j = us.length - 1; j >= 0; j--) ctx.lineTo(X(us[j]), yPos(spodek[us[j]], yL));
+                ctx.closePath(); ctx.fillStyle = `hsla(${GSL_HUE_HLADIN[k]}, 74%, 40%, 0.7)`; ctx.fill();
+                ctx.strokeStyle = barva; ctx.lineWidth = 1.5;
+                ctx.beginPath(); us.forEach((i, j) => j ? ctx.lineTo(X(i), yPos(vrch[i], yL)) : ctx.moveTo(X(i), yPos(vrch[i], yL))); ctx.stroke();
+            });
+            legenda.push({ barva, t: k === 5 ? 'nad 10 °C' : `${GSL_HLADINY[k]}–${GSL_HLADINY[k + 1]}` });
+            spodek = vrch;
+        }
+        if (trendHladina >= 0) {
+            const tr = trendPoUsecich(trendVals);
+            if (tr) { caraPoUsecich(tr, yL, "#e65100", 4, [10, 6]); legenda.push({ barva: "#e65100", t: `trend BEDD ${GSL_HLADINY[trendHladina]}` }); }
+        }
+        if (rightAxis) { caraPoUsecich(lineVals, yR, "#000", 3); legenda.push({ barva: "#000", t: "srážky (pravá osa)" }); }
+    } else {
+        caraPoUsecich(lineVals, yL, "#2e7d32", 3);
+        legenda.push({ barva: "#2e7d32", t: "Meziroční data" });
+        const tr = trendPoUsecich(lineVals);
+        if (tr) { caraPoUsecich(tr, yL, "#e65100", 4, [10, 6]); legenda.push({ barva: "#e65100", t: vyb.trend === '0' ? "Vyhlazený celoobdobový trend" : `Vyhlazený ${vyb.trend} letý trend` }); }
+    }
+
+    // --- titulky a legenda ---
+    const nazev = { veg: "Odhadovaný vegetační růst v % " + (D.zeme ? "maxima Země" : "potenciálu lokality"),
+                    srazky: "Průměrný měsíční srážkový úhrn (mm)", bdd: "BEDD – Ø suma teplot na dekádu po teplotních pásmech (°C·dní)",
+                    oboje: "BEDD (plochy, levá osa) a srážky (černě, pravá osa)" }[rezim];
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillStyle = "#333"; ctx.font = "bold 16px sans-serif";
+    ctx.fillText(`${nazev} – lat ${D.lat} lon ${D.lon}`, padLeft, 22);
+    ctx.font = "13px sans-serif"; ctx.fillStyle = "#555";
+    ctx.fillText(`Roky: ${gslPopisRozsahu(vyb.roky)} | dekády: ${gslPopisDekad(vyb)}` + (stackBdd ? ` | hladiny: ${gslPopisHladin(vyb)}` : '') + ` | ${poDekadach ? "po dekádách" : "roční průměr z vybraných dekád"} | model GFDL-ESM2M, RCP6.0`, padLeft, 42);
+    let lx = padLeft; ctx.font = "bold 14px sans-serif";
+    legenda.forEach(l => { ctx.fillStyle = l.barva; const t = "■ " + l.t; ctx.fillText(t, lx, 68); lx += ctx.measureText(t).width + 22; });
+}
+
+// =============================================================================
+// 8. TABULKY (výpis), EXPORT DO .html a .csv – vše se sestavuje až po kliknutí
+// =============================================================================
+function gslStat(arr) {                      // arr: [{rok, v}]
+    const a = arr.filter(p => p.v === p.v);
+    if (!a.length) return null;
+    const n = a.length, m = a.reduce((s, p) => s + p.v, 0) / n;
+    const sd = Math.sqrt(a.reduce((s, p) => s + (p.v - m) * (p.v - m), 0) / n);
+    let mn = a[0], mx = a[0]; a.forEach(p => { if (p.v < mn.v) mn = p; if (p.v > mx.v) mx = p; });
+    let sklon = NaN;
+    if (n > 2) { const mr = a.reduce((s, p) => s + p.rok, 0) / n; let sx = 0, sxy = 0; a.forEach(p => { sx += (p.rok - mr) ** 2; sxy += (p.rok - mr) * (p.v - m); }); if (sx > 0) sklon = sxy / sx * 10; }
+    return { n, m, sd, cv: m ? sd / Math.abs(m) * 100 : NaN, mn, mx, sklon };
+}
+const gslF = (v, d = 1) => (v === v && v !== null && v !== undefined) ? Number(v).toFixed(d) : '';
+const gslEsc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+function gslTabulka(id, nadpis, popis, hlavicky, radky) {
+    return `<h4 style="margin:18px 0 4px 0;">${nadpis}</h4>${popis ? `<div class="popis">${popis}</div>` : ''}` +
+        `<table id="${id}" class="razeni"><thead><tr>${hlavicky.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>` +
+        radky.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('') + `</tbody></table>`;
+}
+
+function sestavVypis(D) {
+    const roky = D.roky.filter(z => z.ok), vyb = D.vyb, out = [];
+    const rad = (fn) => roky.map(z => ({ rok: z.rok, v: fn(z) }));
+
+    // 1) po zvolených rozsazích let
+    const r1 = vyb.roky.map((r, s) => {
+        const z = roky.filter(x => x.seg === s); if (!z.length) return null;
+        const m = f => z.reduce((a, x) => a + f(x), 0) / z.length;
+        return [`${r.od}–${r.do}`, z.length, gslF(m(x => x.P), 0), gslF(m(x => x.PM)), gslF(m(x => x.PET), 0), gslF(m(x => x.bil), 0),
+                gslF(m(x => x.BvybSuma), 0), gslF(m(x => x.sezona), 0), gslF(m(x => x.veg))];
+    }).filter(Boolean);
+    out.push(gslTabulka('tab_prehled', 'Přehled za zvolená období',
+        `Průměr za rok ve vybraných dekádách (${gslPopisDekad(vyb)}). Srážky − PET je klimatická vláhová bilance (PET dle Oudina z teploty a záření).`,
+        ['Období (roky)', 'Počet let', 'Srážky (mm/rok)', 'Srážky Ø měs. (mm)', 'PET (mm/rok)', 'Srážky − PET (mm)', 'Suma BEDD ve výběru (°C·dní)', 'Vegetační období (dní, Ø teplota ≥ 5 °C)', 'Vegetace (%)'], r1));
+
+    // 2) hladiny BEDD
+    const r2 = [0, 1, 2, 3, 4, 5].map(k => {
+        const st = gslStat(rad(z => z.B[k])), nz = roky.reduce((a, z) => a + (z.B[k] > 0 ? 1 : 0), 0);
+        return [GSL_HLADINY[k], k === 5 ? 'nad 10 °C' : `${GSL_HLADINY[k]}–${GSL_HLADINY[k + 1]}`, vyb.pasma[k] ? 'ano' : 'ne',
+                st ? gslF(st.m, 0) : '', st ? gslF(st.m / (roky.reduce((a, z) => a + z.cnt, 0) / roky.length), 1) : '',
+                st ? gslF(st.mx.v, 0) + ` (${st.mx.rok})` : '', st ? gslF(st.sklon, 0) : '', nz + ' z ' + roky.length];
+    });
+    out.push(gslTabulka('tab_hladiny', 'Teplo podle hladin BEDD',
+        'Suma stupňodnů nad prahem za rok ve vybraných dekádách. Sloupec „Ø na dekádu“ je suma děleno počtem vybraných dekád.',
+        ['Hladina', 'Teplotní pásmo', 'Ve výběru', 'Ø suma za rok (°C·dní)', 'Ø na dekádu', 'Maximum (rok)', 'Trend na 10 let (°C·dní)', 'Roků s nenulovou hodnotou'], r2));
+
+    // 3) trendy a variabilita
+    const ukaz = [['Srážky (mm/rok)', z => z.P, 0], ['PET (mm/rok)', z => z.PET, 0], ['Srážky − PET (mm)', z => z.bil, 0],
+                  ['Suma BEDD ve výběru (°C·dní)', z => z.BvybSuma, 0], ['BEDD 10 °C (°C·dní)', z => z.B[5], 0],
+                  ['Vegetační období (dní)', z => z.sezona, 0], ['Vegetace (%)', z => z.veg, 1]];
+    const r3 = ukaz.map(([n, f, d]) => { const s = gslStat(rad(f)); return s ? [n, gslF(s.m, d), gslF(s.mn.v, d) + ` (${s.mn.rok})`, gslF(s.mx.v, d) + ` (${s.mx.rok})`, gslF(s.sd, d), gslF(s.cv, 0), gslF(s.sklon, d)] : [n, '', '', '', '', '', '']; });
+    out.push(gslTabulka('tab_trendy', 'Variabilita a trend celého výběru',
+        'Trend je sklon přímky (lineární regrese) přepočtený na 10 let. Variační koeficient (CV) ukazuje, jak moc ukazatel kolísá mezi roky; vysoké CV u srážek znamená riziko sucha.',
+        ['Ukazatel', 'Průměr', 'Minimum (rok)', 'Maximum (rok)', 'Směrodatná odchylka', 'CV (%)', 'Trend na 10 let'], r3));
+
+    // 4) rizikové roky
+    const sP = gslStat(rad(z => z.P)), sB = gslStat(rad(z => z.BvybSuma)), sV = gslStat(rad(z => z.veg));
+    const dry = sP ? roky.filter(z => z.P < 0.8 * sP.m).map(z => z.rok) : [], wet = sP ? roky.filter(z => z.P > 1.2 * sP.m).map(z => z.rok) : [];
+    const sezMax = rad(z => z.sezona).filter(p => p.v === p.v);
+    const r4 = [];
+    if (sP) { r4.push(['Nejsušší rok', sP.mn.rok, gslF(sP.mn.v, 0) + ' mm']); r4.push(['Nejvlhčí rok', sP.mx.rok, gslF(sP.mx.v, 0) + ' mm']);
+              r4.push(['Suché roky (srážky pod 80 % průměru výběru)', dry.length + ' z ' + roky.length, dry.slice(0, 12).join(', ') + (dry.length > 12 ? ' …' : '')]);
+              r4.push(['Vlhké roky (srážky nad 120 % průměru výběru)', wet.length + ' z ' + roky.length, wet.slice(0, 12).join(', ') + (wet.length > 12 ? ' …' : '')]); }
+    if (sB) { r4.push(['Nejchladnější rok (suma BEDD)', sB.mn.rok, gslF(sB.mn.v, 0) + ' °C·dní']); r4.push(['Nejteplejší rok (suma BEDD)', sB.mx.rok, gslF(sB.mx.v, 0) + ' °C·dní']); }
+    if (sV) { r4.push(['Rok s nejnižším růstem vegetace', sV.mn.rok, gslF(sV.mn.v) + ' %']); r4.push(['Rok s nejvyšším růstem vegetace', sV.mx.rok, gslF(sV.mx.v) + ' %']); }
+    out.push(gslTabulka('tab_roky', 'Mimořádné roky ve výběru', 'Orientační přehled pro plánování: roky sucha, nadbytku srážek, chladu a tepla.', ['Ukazatel', 'Rok / počet', 'Hodnota / roky'], r4));
+
+    // 5) výpis po dekádách (jen do 100 řádků)
+    if (D.radky.length <= 100) {
+        out.push(gslTabulka('tab_dekady', 'Výpis po dekádách', 'Vybrané roky a dekády. Hodnoty BEDD jsou sumy nad danou hladinou za dekádu (°C·dní).',
+            ['Rok', 'Dekáda', 'Dní', 'Srážky (mm)', 'PET (mm)', 'BEDD 0', 'BEDD 2', 'BEDD 4', 'BEDD 6', 'BEDD 8', 'BEDD 10', 'Vegetace (%)'],
+            D.radky.map(r => [r.rok, r.dek, r.dny, gslF(r.P), gslF(r.pet), ...r.b.map(v => gslF(v, 0)), gslF(D.zeme ? r.vegZ : r.vegM)])));
+    } else {
+        out.push(`<p class="popis">Výpis po dekádách má ${D.radky.length} řádků (zobrazuje se do 100). Úplná data jsou v exportu do .csv.</p>`);
+    }
+    out.push(gslNavod());
+    return out.join('');
+}
+
+
+function gslNavod() {
+    return `<h4 style="margin:26px 0 6px 0;">Jak výpis číst a k čemu je dobrý</h4><div class="popis" style="font-size:14px;color:#333;line-height:1.45;">
+<p><b>Přehled za zvolená období.</b> Průměr za jeden rok, ale jen z vámi vybraných dekád (např. vegetační sezóna). Porovnejte sloupce mezi řádky: ukáže se, jak se podle modelu mění voda a teplo mezi vybranými obdobími.
+<br>• <b>Srážky</b> jsou skutečný úhrn vody za vybranou část roku. <b>PET</b> je odhad, kolik vody by při jejím dostatku odpařila půda a rostliny, tedy potřeba vláhy.
+<br>• <b>Srážky − PET</b>: záporné číslo znamená deficit, rostliny žijí ze zásob v půdě nebo je potřeba závlaha; kladné číslo znamená přebytek (odtok, doplnění zásob).
+<br>• <b>Suma BEDD</b> je teplo využitelné rostlinami ve vybraných teplotních pásmech. Porovnává se s nároky plodiny nebo odrůdy (kolik tepla potřebuje do zralosti); udávají je šlechtitelé.
+<br>• <b>Vegetační období</b> je odhad počtu dní, kdy průměrná teplota dosahuje alespoň 5 °C. <b>Vegetace %</b> je orientační modelový odhad růstu, hodí se k porovnání míst a let, ne k přesným číslům.</p>
+<p><b>Teplo podle hladin BEDD.</b> Hladina je práh teploty, od kterého rostlina roste. Nízké hladiny (0–4 °C) vystihují chladnomilné rostliny, trávy a časné jaro, vysoké (8–10 °C) teplomilné plodiny jako kukuřici, révu nebo rajčata. Sloupec „Roků s nenulovou hodnotou“ ukáže, zda se vysoké hladiny vůbec dosáhnou: pokud je u nich v mnoha letech nula, teplomilné plodiny tam podle modelu nedozrají. „Trend na 10 let“ říká, o kolik °C·dní se teplo mění za deset let.</p>
+<p><b>Variabilita a trend.</b> Průměr, minimum a maximum ukazují rozpětí, ve kterém se můžete pohybovat. Variační koeficient (CV) měří kolísání mezi roky: u srážek vyšší hodnota (zhruba nad 25–30 %) znamená nespolehlivé zásobení vodou a vyplatí se rezerva nebo závlaha. Trend je sklon přímky; u krátkého výběru (pár let) je nejistý, spolehlivější je z dlouhého období.</p>
+<p><b>Mimořádné roky.</b> Nejsušší, nejvlhčí, nejchladnější a nejteplejší rok. Slouží k plánování rizik: jak suchý či chladný rok je třeba ustát (odolné odrůdy, zásoba vody, termíny setí).</p>
+<p><b>Výpis po dekádách.</b> Podrobnosti po deseti dnech, vhodné pro určení konkrétních období sucha, tepla nebo chladu (setí, výsadba, sklizeň, závlaha). Je-li dat více než 100 řádků, najdete je v exportu do .csv.</p>
+<p><b>Na co si dát pozor.</b> Data jsou projekce jednoho klimatického modelu (GFDL-ESM2M, scénář RCP6.0) v mřížce 0,5° (zhruba 50 km), nikoli předpověď počasí. Místní podmínky (svah, půda, výška, zastínění) se mohou výrazně lišit. Využijte je hlavně k porovnání trendů mezi obdobími a místy. PET, vláhová bilance a vegetace jsou zjednodušené odhady.</p></div>`;
+}
+
+const GSL_EXPORT_CSS = `body{font-family:sans-serif;margin:20px;color:#1f1f1f;max-width:1100px}h1{font-size:20px}h4{margin:18px 0 4px}.popis{font-size:13px;color:#555;margin-bottom:6px}
+table{border-collapse:collapse;width:100%;border:2px solid #b4bac0;background:#fff}th,td{padding:6px 5px;text-align:left;border-bottom:1px solid #ddd;border-right:1px solid #b4bac0;font-size:14px}
+th{background:#e9e9ed;color:#444;cursor:pointer;user-select:none;position:relative;font-size:12px;padding:7px 18px 7px 3px;text-align:center;border:1px solid #b4bac0}
+th:hover{background:#dedede}th.asc::after{content:'▲';position:absolute;right:6px}th.desc::after{content:'▼';position:absolute;right:6px}th.ozn{background:#fff;color:#0f172a}tbody tr:nth-child(even){background:#f2f2f2}`;
+
+function gslNazevSouboru(D, pripona) {
+    const v = D.vyb, rz = { veg: 'vegetace', srazky: 'srazky', bdd: 'bdd', oboje: 'bdd-srazky' }[v.rezim];
+    const iv = a => a.length ? a.map(i => `${i.od}-${i.do}`).join('+') : 'vse';
+    return `${rz}_lat${D.lat}_lon${D.lon}_roky${v.roky.map(r => r.od + '-' + r.do).join('+')}_dek${iv(v.dek).replace(/°C/g, '')}` +
+           (v.rezim === 'bdd' || v.rezim === 'oboje' ? `_hl${iv(v.hladinyInt).replace(/°C/g, '')}C` : '') + '.' + pripona;
+}
+function gslStahni(nazev, obsah, mime) {
+    const blob = new Blob([obsah], { type: mime }), a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = nazev; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+function gslHtmlDokument(D) {
+    const v = D.vyb;
+    const meta = `Souřadnice: lat ${D.lat}, lon ${D.lon}${D.adresa ? ' (' + gslEsc(D.adresa) + ')' : ''}<br>Roky: ${gslPopisRozsahu(v.roky)}; dekády: ${gslPopisDekad(v)}; hladiny BEDD: ${gslPopisHladin(v)}<br>Vegetace: půda ${gslEsc(document.getElementById('veg_puda')?.selectedOptions[0]?.text || '')}, kořeny ${gslEsc(document.getElementById('veg_koreny')?.value || '')} m, 100 % = ${D.zeme ? 'maximum Země' : 'potenciál lokality'}<br>Zdroj: Copernicus C3S, model GFDL-ESM2M, scénář RCP6.0, mřížka 0,5°, dekádní krok. Vegetace, PET a vláhová bilance jsou orientační odhady.`;
+    return `<!DOCTYPE html><html lang="cs"><head><meta charset="utf-8"><title>${gslEsc(gslNazevSouboru(D, 'html'))}</title><style>${GSL_EXPORT_CSS}</style></head><body><h1>Výpis dat BEDD, srážek a vegetace</h1><p class="popis">${meta}</p>${sestavVypis(D)}` +
+           `<script>${inicializujRazeniTabulky.toString()}\ndocument.querySelectorAll('table.razeni').forEach(function(t){inicializujRazeniTabulky(t.id);});<\/script></body></html>`;
+}
+function gslCsv(D) {
+    const c = v => (v === v && v !== null) ? String(Number(v.toFixed ? +v.toFixed(2) : v)).replace('.', ',') : '';
+    const hl = ['rok', 'dekada', 'dni', 'srazky_mm', 'pet_mm', 'bedd_0C', 'bedd_2C', 'bedd_4C', 'bedd_6C', 'bedd_8C', 'bedd_10C', 'vegetace_pct_potencial_mista', 'vegetace_pct_maximum_zeme'];
+    const rows = D.radky.map(r => [r.rok, r.dek, r.dny, c(r.P), c(r.pet), ...r.b.map(c), c(r.vegM), c(r.vegZ)].join(';'));
+    return '\ufeff' + [hl.join(';'), ...rows].join('\r\n');
+}
+function exportujVypisHtml() { if (GSL_VYPIS) gslStahni(gslNazevSouboru(GSL_VYPIS, 'html'), gslHtmlDokument(GSL_VYPIS), 'text/html;charset=utf-8'); }
+function exportujVypisCsv()  { if (GSL_VYPIS) gslStahni(gslNazevSouboru(GSL_VYPIS, 'csv'), gslCsv(GSL_VYPIS), 'text/csv;charset=utf-8'); }
+function zavriVypis() { const t = document.getElementById('tabulka'); t.style.opacity = '0'; setTimeout(() => { t.style.display = 'none'; }, 500); }
+
+function otevriVypis() {
+    const D = GSL_VYPIS; if (!D) return;
+    const tabu = document.getElementById('tabulka');
+    const tl = (barva, txt, fn) => `<button class="resizer3" style="height:auto;min-height:30px;margin:0;cursor:pointer;color:#454545;opacity:0.9;padding:5px 10px;border-radius:5px;width:auto;background:${barva};position:relative;" onclick="${fn}">${txt}</button>`;
+    tabu.innerHTML = `<div style="position:absolute;display:flex;right:0;top:0;z-index:1010;width:auto;min-height:30px;box-sizing:border-box;margin:5px;gap:10px;">` +
+        tl('hsl(60, 100%, 90%)', 'Exportovat výpis do .html', 'exportujVypisHtml()') + tl('hsl(100, 100%, 90%)', 'Exportovat data do .csv', 'exportujVypisCsv()') + tl('hsl(0, 100%, 90%)', 'Zavři výpis', 'zavriVypis()') + `</div>` +
+        `<div style="width:100%;height:100%;overflow:auto;box-sizing:border-box;padding:10px 15px 15px 15px;border-radius:7px;background:linear-gradient(0deg, rgb(172,172,172) 0%, rgb(252,252,253) 0.5%, rgb(249,250,250) 99%, rgb(234,234,234) 100%);color:hsl(0,0%,12%);font-size:15px;line-height:1.3;">` +
+        `<h4 id="geo" style="margin:10px;text-align:center;">${gslNadpisLokality(D)}</h4><style>#tabulka .popis{font-size:13px;color:#555;margin-bottom:6px}</style>` + sestavVypis(D) + `<br></div>`;
+    document.querySelectorAll('#tabulka table.razeni').forEach(t => inicializujRazeniTabulky(t.id));
+    tabu.style.display = 'block'; tabu.style.height = window.innerHeight + 'px';
+    setTimeout(() => { tabu.style.opacity = '1'; }, 50);
+}
+
+
+document.addEventListener("DOMContentLoaded", async function() {
+    try {
+        // Asynchronní načtení registru a inicializace mřížky AgricDB
+        await gslKlientskaPamet.init();
+        // Teprve po úspěšném načtení databáze vykreslíme mapu a panel
+        //prekresliGslMapu();
+        jezaskr("");
+        panel.style.display = "flex";
+    } catch (err) {
+        console.error("Chyba při inicializaci AgricDB:", err);
+        const metaGsl = document.getElementById("gsl-meta-info");
+        if (metaGsl) metaGsl.innerHTML = `<span style="color:#d32f2f;">Chyba načtení databáze: ${err.message}</span>`;
+    }
+});
+
+</script>
+
+
+
+
+
+
+    <script>
+        // Definice globálních datových sad (stupnic)
+        const SCALES = {
+            "roků": Array.from({length: 2099 - 2011 + 1}, (_, i) => 2011 + i),
+            "dekády": Array.from({length: 36}, (_, i) => `${i + 1}`),
+            "hladiny": ["0°C", "2°C", "4°C", "6°C", "8°C", "10°C"]
+        };
+
+        // --- UNIVERZÁLNÍ ŠABLONA (TŘÍDA) PRO MULTI-SLIDER ---
+        class MultiSlider {
+            constructor(targetId, scaleType, inputName) {
+                this.targetDiv = document.getElementById(targetId);
+                this.scaleType = scaleType;
+                this.scaleValues = SCALES[scaleType];
+                this.inputName = inputName;
+                
+                this.pairs = [];
+                this.pairCounter = 0;
+                this.gridDensityStep = 1;
+
+                if (!this.targetDiv) {
+                    console.error(`Kontejner s ID "${targetId}" nebyl nalezen.`);
+                    return;
+                }
+
+                this.buildHTML();
+                this.initElements();
+                this.calculateDensity();
+                this.createPair(0, Math.min(10, this.scaleValues.length - 1));
+                this.setupEvents();
+            }
+
+            // Dynamicky vygeneruje HTML strukturu uvnitř předaného divu
+            buildHTML() {
+                this.targetDiv.innerHTML = `
+   <div class="sliderc">
+    <div class="slider-container" id="sliderContainer">
+        <div class="sliderwrapper"></div>
+        <div class="slider-scale-wrapper" id="sliderScaleWrapper"></div>
+        <div class="slider-base-track" id="sliderTrack"></div>
+    </div>
+    <div style="margin-top: 10px;">
+        <button class="resizer3 btn btn-plus" id="addPairBtn" title="Přidat dvojici jezdců">+</button>
+        <button class="resizer3 btn btn-minus" id="removePairBtn" title="Odebrat posledně přidanou dvojici jezdců">-</button>
+    </div>
+   </div>
+                    <input type="hidden" onchange="" id="${this.inputName}" name="${this.inputName}" class="slider-hidden-input">
+                    
+                `;
+            }
+/*<div class="preview-box">Hidden input (<strong>${this.inputName}</strong>): <span class="preview-data">[]</span></div>*/
+            initElements() {
+                this.container = this.targetDiv.querySelector('.slider-container');
+                this.scaleWrapper = this.targetDiv.querySelector('.slider-scale-wrapper');
+                this.trackBase = this.targetDiv.querySelector('.slider-base-track');
+                this.btnPlus = this.targetDiv.querySelector('.btn-plus');
+                this.btnMinus = this.targetDiv.querySelector('.btn-minus');
+                this.hiddenInput = this.targetDiv.querySelector('.slider-hidden-input');
+                this.previewData = this.targetDiv.querySelector('.preview-data');
+            }
+
+            setupEvents() {
+                this.btnPlus.addEventListener('click', () => {
+                    const space = this.findFreeSpaceIndex();
+                    if (space) {
+                        this.createPair(space.start, space.end);
+                        this.updateMinusButtonVisibility();
+                    } else {
+                        return;//alert('Na ose již není dostatek volného místa pro další dvojici!');
+                    }
+                });
+
+                this.btnMinus.addEventListener('click', () => {
+                    if (this.pairs.length > 1) {
+                        const lastPair = this.pairs.pop();
+                        lastPair.trackEl.remove();
+                        lastPair.leftEl.remove();
+                        lastPair.rightEl.remove();
+                        this.updateDOM();
+                        this.updateMinusButtonVisibility();
+                    }
+                });
+
+                // Responzivní přepočet při změně velikosti okna
+                const resizeObserver = new ResizeObserver(() => {
+                    this.calculateDensity();
+                });
+                resizeObserver.observe(this.container);
+            }
+
+            renderScaleStructure() {
+                this.scaleWrapper.innerHTML = '';
+                const stepsCount = this.scaleValues.length;
+                
+                this.scaleValues.forEach((val, index) => {
+                    const pct = (index / (stepsCount - 1)) * 100;
+                    const pointEl = document.createElement('div');
+                    pointEl.className = 'scale-point';
+
+pointEl.style.left = `${pct}%`;
+
+    if (this.scaleType == 'dekády' && val % 3 === 0) { 
+pointEl.innerHTML = `<div class="scale-label">${val}</div> <div class="scale-tick mes"></div>`;
+    } else {
+pointEl.innerHTML = `<div class="scale-label">${val}</div> <div class="scale-tick"></div>`;
+}
+
+this.scaleWrapper.appendChild(pointEl);
+});
+}
+calculateDensity() {
+this.renderScaleStructure(); // Znovuvytvoření prvků stupnice pro správný výpočet šířky
+const containerWidth = this.scaleWrapper.getBoundingClientRect().width || 900;
+const stepsCount = this.scaleValues.length;
+const estimatedLabelWidth = 48;
+const maxLabelsPossible = Math.floor(containerWidth / estimatedLabelWidth);
+let step = 1;
+if (stepsCount > maxLabelsPossible) {
+step = Math.ceil(stepsCount / maxLabelsPossible);
+}
+if (step > 2 && step <= 5) step = 5;
+else if (step > 5 && step <= 10) step = 10;
+else if (step > 10) step = 20;
+this.gridDensityStep = step;
+this.resolveLabelsEngine();
+}
+resolveLabelsEngine() {
+const points = Array.from(this.scaleWrapper.querySelectorAll('.scale-point'));
+const stepsCount = this.scaleValues.length;
+const lastIndex = stepsCount - 1;
+const totalWidthPx = this.scaleWrapper.getBoundingClientRect().width || 900;
+const handleRoles = {};
+this.pairs.forEach(p => {
+if (handleRoles[p.leftIndex] !== 'right') handleRoles[p.leftIndex] = 'left';
+handleRoles[p.rightIndex] = 'right';
+});
+const labelWidth = 46;
+let dataset = [];
+for (let i = 0; i <= lastIndex; i++) {
+const pct = i / lastIndex;
+dataset.push({
+index: i,
+pixelX: pct * totalWidthPx,
+isHandle: handleRoles[i] !== undefined,
+handleRole: handleRoles[i] || null,
+show: false,
+level: 0,
+text: this.scaleValues[i]
+});
+}
+dataset.forEach(p => {
+if (p.index === 0 || p.index === lastIndex || p.index % this.gridDensityStep === 0) {
+p.show = true;
+}
+if (p.index !== lastIndex && p.show) {
+if ((dataset[lastIndex].pixelX - p.pixelX) < labelWidth + 6) {
+p.show = false;
+}
+}
+if (this.scaleType === "roků" && this.gridDensityStep > 1 && p.index !== 0 && p.index !== lastIndex) {
+p.text = `${String(p.text).slice(-2)}`;
+}
+});
+dataset.forEach(p => {
+if (p.isHandle) {
+p.show = true;
+p.text = this.scaleValues[p.index];
+dataset.forEach(other => {
+if (!other.isHandle && other.show) {
+if (Math.abs(p.pixelX - other.pixelX) < labelWidth) {
+other.show = false;
+}
+}
+});
+}
+});
+let occupiedHandleSlotsByLevel = {};
+dataset.forEach(current => {
+if (!current.show) return;
+const slotFrom = current.pixelX - (labelWidth / 2) - 2;
+const slotTo = current.pixelX + (labelWidth / 2) + 2;
+if (current.isHandle) {
+let assignedLevel = 0;
+let searching = true;
+while (searching) {
+if (!occupiedHandleSlotsByLevel[assignedLevel]) {
+searching = false;
+break;
+}
+let collisionWithHandle = occupiedHandleSlotsByLevel[assignedLevel].some(slot => {
+return !(slotTo < slot.from || slotFrom > slot.to);
+});
+if (!collisionWithHandle) {
+let rightHandleOnLeft = dataset.find(item =>
+item.index !== current.index &&
+item.pixelX < current.pixelX &&
+(current.pixelX - item.pixelX) < labelWidth + 4 &&
+item.isHandle && item.handleRole === 'right'
+);
+if (rightHandleOnLeft && current.handleRole === 'left' && assignedLevel === 0) {
+collisionWithHandle = true;
+}
+}
+if (collisionWithHandle) {
+assignedLevel++;
+} else {
+searching = false;
+}
+}
+current.level = assignedLevel;
+if (!occupiedHandleSlotsByLevel[assignedLevel]) {
+occupiedHandleSlotsByLevel[assignedLevel] = [];
+}
+occupiedHandleSlotsByLevel[assignedLevel].push({ from: slotFrom, to: slotTo });
+} else {
+current.level = 0;
+}
+});
+points.forEach((point, index) => {
+const data = dataset[index];
+const labelEl = point.querySelector('.scale-label');
+labelEl.textContent = data.text;
+if (data.show) {
+point.classList.toggle('is-active', data.isHandle);
+const yOffset = data.level * -11;
+labelEl.style.transform = `translateY(${yOffset}px)`;
+labelEl.style.opacity = '1';
+} else {
+point.classList.remove('is-active');
+labelEl.style.opacity = '0';
+}
+});
+}
+createPair(initLeftIndex, initRightIndex) {
+const id = this.pairCounter++;
+const trackEl = document.createElement('div');
+trackEl.className = 'slider-highlight-track';
+const leftEl = document.createElement('div');
+leftEl.className = 'slider-handle';
+const rightEl = document.createElement('div');
+rightEl.className = 'slider-handle';
+this.trackBase.appendChild(trackEl);
+this.trackBase.appendChild(leftEl);
+this.trackBase.appendChild(rightEl);
+const pairObj = { id, leftIndex: initLeftIndex, rightIndex: initRightIndex, trackEl, leftEl, rightEl };
+this.pairs.push(pairObj);
+this.initDrag(leftEl, id, 'left');
+this.initDrag(rightEl, id, 'right');
+this.initDragTrack(trackEl, id); // NOVINKA: Aktivace tahání celého úseku
+this.updateDOM();
+}
+// --- NOVÁ LOGIKA PRO POHYB CELÉHO ÚSEKU NAJEDNOU ---
+initDragTrack(trackEl, pairId) {
+trackEl.addEventListener('pointerdown', (e) => {
+// Ignorujeme, pokud uživatel klikl pravým tlačítkem
+if (e.button !== 0) return;
+trackEl.setPointerCapture(e.pointerId);
+const pair = this.pairs.find(p => p.id === pairId);
+const initialWidthIndices = pair.rightIndex - pair.leftIndex; // Pevná šířka úseku v počtu kroků
+// Zjistíme mantinely zleva a zprava (sousední jezdci nebo kraje osy)
+const leftLimit = this.getLeftLimitIndex(pairId);
+const rightLimit = this.getRightLimitIndex(pairId);
+const startX = e.clientX;
+const startLeftIndex = pair.leftIndex;
+const onPointerMove = (moveEvent) => {
+const rect = this.trackBase.getBoundingClientRect();
+const pxPerIndex = rect.width / (this.scaleValues.length - 1);
+// Kolik kroků (indexů) ujel kurzor od začátku stisknutí
+const deltaX = moveEvent.clientX - startX;
+const indexOffset = Math.round(deltaX / pxPerIndex);
+// Výpočet nových teoretických indexů pro oba jezdce
+let newLeft = startLeftIndex + indexOffset;
+let newRight = newLeft + initialWidthIndices;
+// Kontrola a ořezání pohybu podle levého limitu
+if (newLeft < leftLimit) {
+newLeft = leftLimit;
+newRight = newLeft + initialWidthIndices;
+}
+// Kontrola a ořezání pohybu podle pravého limitu
+if (newRight > rightLimit) {
+newRight = rightLimit;
+newLeft = newRight - initialWidthIndices;
+}
+// Zápis nových souřadnic
+pair.leftIndex = newLeft;
+pair.rightIndex = newRight;
+this.updateDOM();
+};
+const onPointerUp = (upEvent) => {
+trackEl.releasePointerCapture(upEvent.pointerId);
+this.trackBase.removeEventListener('pointermove', onPointerMove);
+this.trackBase.removeEventListener('pointerup', onPointerUp);
+};
+this.trackBase.addEventListener('pointermove', onPointerMove);
+this.trackBase.addEventListener('pointerup', onPointerUp);
+});
+}
+initDrag(handleEl, pairId, type) {
+handleEl.addEventListener('pointerdown', (e) => {
+if (e.button !== 0) return;
+handleEl.setPointerCapture(e.pointerId);
+const onPointerMove = (moveEvent) => {
+const rect = this.trackBase.getBoundingClientRect();
+let pct = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+pct = Math.max(0, Math.min(100, pct));
+const totalSteps = this.scaleValues.length - 1;
+let targetIndex = Math.round((pct / 100) * totalSteps);
+const currentPair = this.pairs.find(p => p.id === pairId);
+if (type === 'left') {
+if (targetIndex > currentPair.rightIndex) targetIndex = currentPair.rightIndex;
+const limitIndex = this.getLeftLimitIndex(pairId);
+if (targetIndex < limitIndex) targetIndex = limitIndex;
+currentPair.leftIndex = targetIndex;
+} else {
+if (targetIndex < currentPair.leftIndex) targetIndex = currentPair.leftIndex;
+const limitIndex = this.getRightLimitIndex(pairId);
+if (targetIndex > limitIndex) targetIndex = limitIndex;
+currentPair.rightIndex = targetIndex;
+}
+this.updateDOM();
+};
+const onPointerUp = (upEvent) => {
+handleEl.releasePointerCapture(upEvent.pointerId);
+this.trackBase.removeEventListener('pointermove', onPointerMove);
+this.trackBase.removeEventListener('pointerup', onPointerUp);
+};
+this.trackBase.addEventListener('pointermove', onPointerMove);
+this.trackBase.addEventListener('pointerup', onPointerUp);
+});
+}
+updateDOM() {
+const totalSteps = this.scaleValues.length - 1;
+this.pairs.forEach(pair => {
+const leftPct = (pair.leftIndex / totalSteps) * 100;
+const rightPct = (pair.rightIndex / totalSteps) * 100;
+pair.leftEl.style.left = `${leftPct}%`;
+pair.rightEl.style.left = `${rightPct}%`;
+pair.trackEl.style.left = `${leftPct}%`;
+pair.trackEl.style.width = `${rightPct - leftPct}%`;
+});
+this.resolveLabelsEngine();
+const dataToSave = this.pairs
+.map(p => ({
+od: this.scaleValues[p.leftIndex],
+do: this.scaleValues[p.rightIndex]
+}))
+.sort((a, b) => this.scaleValues.indexOf(a.od) - this.scaleValues.indexOf(b.od));
+const jsonString = JSON.stringify(dataToSave);
+this.hiddenInput.value = jsonString;
+if (s != 1) posunulSeRokProjekce(this.hiddenInput.id);
+s = 0;
+}
+getLeftLimitIndex(currentId) {
+const current = this.pairs.find(p => p.id === currentId);
+let limitIndex = 0;
+this.pairs.forEach(p => {
+if (p.id !== currentId && p.rightIndex <= current.leftIndex && p.rightIndex > limitIndex) {
+limitIndex = p.rightIndex;
+}
+});
+return limitIndex;
+}
+getRightLimitIndex(currentId) {
+const current = this.pairs.find(p => p.id === currentId);
+let limitIndex = this.scaleValues.length - 1;
+this.pairs.forEach(p => {
+if (p.id !== currentId && p.leftIndex >= current.rightIndex && p.leftIndex < limitIndex) {
+limitIndex = p.leftIndex;
+}
+});
+return limitIndex;
+}
+findFreeSpaceIndex() {
+let intervals = this.pairs.map(p => ({ start: p.leftIndex, end: p.rightIndex }));
+intervals.sort((a, b) => a.start - b.start);
+const lastIndex = this.scaleValues.length - 1;
+let fullTimeline = [{ start: 0, end: 0 }, ...intervals, { start: lastIndex, end: lastIndex }];
+let maxSpace = 0;
+let bestGap = null;
+for (let i = 0; i < fullTimeline.length - 1; i++) {
+let gapStart = fullTimeline[i].end;
+let gapEnd = fullTimeline[i+1].start;
+let gapSize = gapEnd - gapStart;
+if (gapSize > maxSpace) {
+maxSpace = gapSize;
+bestGap = { start: gapStart, end: gapEnd };
+}
+}
+if (maxSpace >= 1) {
+let center = bestGap.start + Math.floor(maxSpace / 2);
+let start = Math.max(bestGap.start, center - 1);
+let end = Math.min(bestGap.end, center + 1);
+return { start, end };
+}
+return null;
+}
+updateMinusButtonVisibility() {
+this.btnMinus.style.display = this.pairs.length > 1 ? 'block' : 'none';
+}
+}
+
+var s = 1;
+// --- INICIALIZACE SAMOSTATNÝCH SLIDERŮ ---
+// Parametry: new MultiSlider("ID_KONTEJNERU", "TYP_MĚŘÍTKA", "NAME_HIDDEN_INPUTU")
+const sliderRoky = new MultiSlider("slider-roky-kontejner", "roků", "vybrane_roky");
+const sliderDekady = new MultiSlider("slider-dekady-kontejner", "dekády", "vybrane_dekady");
+const sliderHladiny = new MultiSlider("slider-hladiny-kontejner", "hladiny", "vybrane_hladiny");
+
+</script>
+
+  <script>
+    function switchTab(event, tabId) {
+      // 1. Skryjeme všechny obsahy
+      const contents = document.querySelectorAll('.tab-content');
+      contents.forEach(content => {
+        content.classList.remove('active');
+      });
+
+      // 2. Deaktivujeme všechna tlačítka
+      const buttons = document.querySelectorAll('.tab-btn');
+      buttons.forEach(button => {
+        button.classList.remove('active');
+      });
+
+      // 3. Aktivujeme správný obsah
+      document.getElementById(tabId).classList.add('active');
+
+      // 4. Aktivujeme kliknuté tlačítko
+      event.currentTarget.classList.add('active');
+    }
+  </script>
+
+    <script>
+        function inicializujRazeniTabulky(idTabulky) {
+            const tabulka = document.getElementById(idTabulky);
+            if (!tabulka) return;
+
+            const hlavicky = tabulka.querySelectorAll('th');
+            const tBody = tabulka.querySelector('tbody');
+            const radky = Array.from(tBody.querySelectorAll('tr'));
+            const smeryRazeni = Array(hlavicky.length).fill(true);
+
+            // Pomocná funkce pro převod textu na validní timestamp data
+            function prevedNaDatum(text) {
+                if (!text) return NaN;
+                const ceskeDatumRegex = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/;
+                const match = text.match(ceskeDatumRegex);
+                if (match) {
+                    return Date.parse(`${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`);
+                }
+                return Date.parse(text);
+            }
+
+            // Pomocná funkce pro určení typu sloupce
+            function urciTypSloupce(indexSloupce) {
+                let typy = { numeric: 0, date: 0, string: 0 };
+                let pocetRadkuSValidnimiDaty = 0;
+
+                radky.forEach(radek => {
+                    const bunka = radek.cells[indexSloupce];
+                    if (!bunka) return;
+                    
+                    const text = bunka.textContent.trim();
+                    if (text === '') return; // Ignorovat prázdné buňky při detekci typu
+
+                    pocetRadkuSValidnimiDaty++;
+
+                    if (!isNaN(text) && !isNaN(parseFloat(text))) {
+                        typy.numeric++;
+                    } else if (!isNaN(prevedNaDatum(text))) {
+                        typy.date++;
+                    } else {
+                        typy.string++;
+                    }
+                });
+
+                let vyplneneTypy = 0;
+                if (typy.numeric > 0) vyplneneTypy++;
+                if (typy.date > 0) vyplneneTypy++;
+                if (typy.string > 0) vyplneneTypy++;
+
+                if (vyplneneTypy > 1) return 'mixed';
+                if (typy.numeric === pocetRadkuSValidnimiDaty) return 'numeric';
+                if (typy.date === pocetRadkuSValidnimiDaty) return 'date';
+                return 'string';
+            }
+
+            // Přidání událostí na hlavičky
+            hlavicky.forEach((hlavicka, indexSloupce) => {
+                const typDat = urciTypSloupce(indexSloupce);
+                
+                hlavicka.addEventListener('click', () => {
+                    const vzestupne = smeryRazeni[indexSloupce];
+                    
+                    // Odstranění šipek ze všech ostatních hlaviček
+                    hlavicky.forEach(h => h.classList.remove('asc', 'desc', 'ozn'));
+                    // Přidání správné třídy pro šipku na aktivní hlavičku
+                    hlavicka.classList.add(vzestupne ? 'asc' : 'desc');
+                    hlavicka.classList.add( (vzestupne || !vzestupne) ? 'ozn' : null);
+
+                    radky.sort((radekA, radekB) => {
+                        const valA = radekA.cells[indexSloupce]?.textContent.trim() || '';
+                        const valB = radekB.cells[indexSloupce]?.textContent.trim() || '';
+
+                        // --- STRATEGIE PRO PRÁZDNÉ BUŇKY ---
+                        // Pokud jsou obě prázdné, zachováme pozici
+                        if (valA === '' && valB === '') return 0;
+                        // Pokud je A prázdná, letí dospod (vrátí kladné číslo, posune se dolů)
+                        if (valA === '') return 1;
+                        // Pokud je B prázdná, letí dospod (vrátí záporné číslo, B se posune dolů)
+                        if (valB === '') return -1;
+
+                        if (valA === valB) return 0;
+
+                        let porovnani = 0;
+
+                        switch (typDat) {
+                            case 'numeric':
+                                porovnani = parseFloat(valA) - parseFloat(valB);
+                                break;
+                            case 'date':
+                                porovnani = prevedNaDatum(valA) - prevedNaDatum(valB);
+                                break;
+                            case 'mixed':
+                                porovnani = valA.length - valB.length;
+                                if (porovnani === 0) porovnani = valA.localeCompare(valB);
+                                break;
+                            case 'string':
+                            default:
+                                porovnani = valA.localeCompare(valB, 'cs', { sensitivity: 'base' });
+                                break;
+                        }
+
+                        return vzestupne ? porovnani : -porovnani;
+                    });
+
+                    radky.forEach(radek => tBody.appendChild(radek));
+                    smeryRazeni[indexSloupce] = !vzestupne;
+                });
+            });
+        }
+
+    </script>
+
+</body>
+</html>
+
+

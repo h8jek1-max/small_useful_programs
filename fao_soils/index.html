@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Vlastnosti půd</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="leaflet.min.css">
+    <script src="leaflet.min.js"></script>
+
+<style>
+        body { margin: 0; padding: 0; font-family: sans-serif; display: flex; height: 100vh; }
+    #mapa-kontainer {  flex-grow: 1; height: 100%; border-right: 7px solid #ddd; margin: 0px;}
+    .pudni-panel {overflow-y: auto;height: 100%; display: flex; flex-direction: column; gap: 0px; max-width: 550px; margin: 0px; background: #fff; padding: 0px 5px 0px 5px;}
+    table.pudni-tabulka { width: 100%; border-collapse: collapse; margin-top: 0px; }
+    table.pudni-tabulka th, table.pudni-tabulka td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+    table.pudni-tabulka th { background: #e4f0d6; color: #335e23; }
+    .dominantni-info { font-weight: bold; color: #2e7d32; margin-bottom: 5px; }
+     .controls { margin-bottom: 5px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+        label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+        input, select, button { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #2e7d32; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #1b5e20; }
+</style>
+
+</head>
+<body>
+	
+    <div id="mapa-kontainer"></div>
+    
+<div class="pudni-panel">
+    <h4 style="margin:10px;text-align: center;">Pedologický profil</h4>
+   
+    <div class="controls"> 
+		
+<div>
+    <label>Vybrat lokalitu v ČR</label>
+    <select id="lokalita"  onchange="aplikujPrednastavenouLokalitu()">
+            <option value="CUSTOM">-- Vlastní souřadnice (zadejte vedle) --</option>
+
+        <optgroup label="Česká republika">
+			<optgroup label="NEJSUŠŠÍ OBLASTI (Srážkové stíny a teplé nížiny)">
+        <option value="50.27,13.43" data-name="Žatecko (Nejsušší oblast ČR - srážkový stín)">Žatecko (Srážkový stín)</option>
+        <option value="48.81,16.63" data-name="Pálava / Mikulov (Extrémně teplá a suchá jižní Morava)">Jižní Morava (Pálava)</option>
+        <option value="50.08,14.43" data-name="Praha / Střední Čechy (Urbanizovaná suchá oblast)">Praha a okolí</option>
+        <option value="50.03,15.78" data-name="Pardubicko (Suchá Polabská nížina)">Polabí (Pardubice)</option>
+         </optgroup>
+			<optgroup label="STŘEDNĚ VLHKÉ / PŘECHODOVÉ OBLASTI">
+        <option value="50.633, 15.085" data-name="Sychrov u Turnova (Český ráj / Podkrkonoší)">Sychrov u Turnova</option>
+        <option value="49.40,15.59" data-name="Jihlava (Vysočina - chladnější, proměnlivá oblast)">Vysočina (Jihlava)</option>
+          </optgroup>
+			<optgroup label=" NEJVLHČÍ OBLASTI (Hory a retence)">
+        <option value="50.83,15.27" data-name="Jizerské hory / Bílý Potok (Jedna z nejvlhčích oblastí ČR)">Jizerské hory</option>
+        <option value="50.73,15.74" data-name="Krkonoše / Pec pod Sněžkou (Vysokohorská vlhká zóna)">Krkonoše</option>
+        <option value="49.16,18.23" data-name="Beskydy (Vlhké karpatské pohoří)">Beskydy</option>
+        <option value="49.03,13.42" data-name="Šumava / Modrava (Vysoká retence a srážky)">Šumava</option>
+          </optgroup>
+        </optgroup>
+    </select>
+</div>
+
+    <div style="grid-column: span 1;">
+        <label>Zeměpisné souřadnice (GPS)</label>
+        <input type="text" id="gps_vstup" value="50.08, 14.43" onchange="resetLokalitaSelect()" placeholder="Formát:  50.62,15.09">
+    </div>
+    
+    <div>
+        <label>Zobrazit půdní mapu (1 km)</label>
+        <select id="puda_vrstva_vlastnost" onchange="prekresliPudniVrstvu()">
+            <option value="NONE">-- Skrýt půdní vrstvu --</option>
+            <option value="PH">Kyselost půdy (pH v topsoilu)</option>
+            <option value="CLAY">Obsah jílu v topsoilu (%)</option>
+            <option value="OC">Organický uhlík (%)</option>
+        </select>
+    </div>
+
+<!-- Dynamická legenda mapy -->
+<div id="mapa-legenda" class="pudni-panel" style="display:none; padding:10px; font-size:13px;grid-column: span 3;flex-direction: row;">
+	<div id="puda_opacity"  style="display:none;"><label>Průhlednost vrstvy</label><input type="range" id="puda_vrstva_opacity" min="0" max="1" step="0.1" value="0.6" oninput="upravPrůhlednostVrstvy()" style="display:flex; gap:5px; max-width: 410px; margin: 5px auto 0px auto;"></div>
+    <b id="legenda-titulek">Legenda:</b>
+    <div id="legenda-barvy" style="display:flex; gap:5px; max-width: 410px; margin: 5px auto 0px auto;"></div>
+</div>
+    
+ </div>
+
+     <div id="pudni-komponenty-kontainer" style="margin: 0px 0px 10px 0px;"></div>
+     
+    <div class="controls">     
+    <div class="dominantni-info" id="puda-meta">Klikněte do mapy nebo vyberte lokalitu výše...</div>
+    <!-- Geografické informace o místě -->
+<div id="geo-info-panel" class="dominantni-info" style="background: #e3f2fd; border-color: #2196f3; display:none; margin-bottom:15px;">
+    📍 <b>Lokalita:</b> <span id="geo-obec">-</span>, <span id="geo-okres">-</span>, <span id="geo-stat">-</span>
+</div>
+</div>
+
+</div>
+
+<script>
+    // INICIALIZACE MAPY LEAFLET
+    // Nastaveno na Sychrov u Turnova jako výchozí bod
+    const map = L.map('mapa-kontainer').setView([50.62, 15.09], 10);
+    
+    // Přidáme základní satelitní/topografickou mapu z OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap přispěvatelé'
+    }).addTo(map);
+
+    // Ikona markeru (špendlíku)
+    let aktualniMarker = null;
+
+    // Kliknutí do mapy automaticky načte jak graf sucha, tak půdu
+    map.on('click', function(e) {
+        const lat = e.latlng.lat.toFixed(4);
+        const lon = e.latlng.lng.toFixed(4);
+        
+        // Aktualizujeme náš univerzální textbox souřadnic
+        document.getElementById("gps_vstup").value = `${lat}, ${lon}`;
+        document.getElementById("lokalita").value = "CUSTOM";
+        
+        nactiPudniProfil(lat, lon);
+    });
+    
+function resetLokalitaSelect() {
+    const lokalitaSelect = document.getElementById("lokalita");
+    lokalitaSelect.value = "CUSTOM";
+	lokalitaSelect.selectedOptions[0].dataset.name = "Zeměpisné souřadnice: " + document.getElementById("gps_vstup").value;
+}
+    
+function aplikujPrednastavenouLokalitu() {
+    const lokalitaSelect = document.getElementById("lokalita");
+    const val = lokalitaSelect.value;
+    
+    if (val === "CUSTOM") return;
+    
+        const casti = val.split(",");
+        if (casti.length === 4 && casti[0] === casti[1] && casti[2] === casti[3]) {
+            // Pokud jsou v optionu min/max stejné (bod), zjednodušíme výpis pro uživatele na 2 čísla
+            document.getElementById("gps_vstup").value = `${casti[0]}, ${casti[2]}`;
+        } else {
+            // Jinak vypíšeme celý obdélník oddělený čárkami
+            document.getElementById("gps_vstup").value = casti.join(", ");
+        }
+}
+
+    // Kdykoliv uživatel vybere lokalitu z menu (např. Sychrov), mapa se tam automaticky vycentruje
+    const puvodniAplikujLokalitu = aplikujPrednastavenouLokalitu;
+    aplikujPrednastavenouLokalitu = function() {
+        puvodniAplikujLokalitu();
+        const gpsVstup = document.getElementById("gps_vstup").value;
+        if(gpsVstup) {
+            const [lat, lon] = gpsVstup.split(",").map(num => parseFloat(num.trim()));
+            map.setView([lat, lon], 15);
+            nactiPudniProfil(lat, lon);
+        }
+    };
+    
+    let globatniCiselniky = null;
+let puzniTileLayerLeaflet = null;
+
+// 1. KROK: Načtení číselníků hned při startu webu
+async function nactiCiselniky() {
+    try {
+        const res = await fetch("ciselniky.json");
+        globatniCiselniky = await res.json();
+    } catch (e) {
+        console.error("Nepodařilo se načíst ciselniky.json", e);
+    }
+}
+nactiCiselniky();
+
+// Pomocná funkce pro bezpečný překlad kódu na text z číselníku
+function prelozKod(typCiselniku, kod) {
+    if (!globatniCiselniky || !globatniCiselniky[typCiselniku]) return kod;
+    return globatniCiselniky[typCiselniku][kod] || `Kód: ${kod}`;
+}
+
+// GLOBÁLNÍ PROMĚNNÁ PRO RYCHLOST INFILTRACE (mm/hodinu)
+let vypocitanaRychlostInfiltrace = 20; 
+
+// 1. OPRAVENÁ GEOLOKACE (Reverse Geocoding s korektní URL a parametry)
+async function nactiGeografickeUdaje(lat, lon) {
+    const panel = document.getElementById("geo-info-panel");
+    try {
+        // Oprava URL adresy: přidáno /reverse.php a korektní query string
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&addressdetails=1`, {
+        });
+        if(!res.ok) throw new Error("CORS / Síťová chyba");
+        const geo = await res.json();
+        
+        if(geo.address) {
+            const a = geo.address;
+            // Inteligentní skládání názvu obce podle hierarchie OSM
+            const obec =  a.hamlet || a.village || a.town || a.city || a.suburb || "Neznámé místo";
+            const okres = a.county || a.district || a.state_district || "-";
+            const stat = a.country || "-";
+            
+            document.getElementById("geo-obec").innerText = obec;
+            document.getElementById("geo-okres").innerText = okres;
+            document.getElementById("geo-stat").innerText = stat;
+            panel.style.display = "block";
+        }
+    } catch(e) {
+        console.warn("Geolokace selhala:", e);
+        panel.style.display = "none";
+    }
+}
+
+// 2. PEDOLOGICKÝ ENGINE + SIMULÁTOR INFILTRACE VODY
+async function nactiPudniProfil(lat, lon) {
+    const metaPanel = document.getElementById("puda-meta");
+    const kontainer = document.getElementById("pudni-komponenty-kontainer");
+    kontainer.innerHTML = '<h4 style="text-align: center;margin: 0px 0px 10px 0px;">Procentuelní zastoupení vlastností půd v souboru souřadnic zadané souřadnice pro 1 km</h4>';
+    
+    nactiGeografickeUdaje(lat, lon);
+    
+    try {
+        const res = await fetch(`get_soil.php?lat=${lat}&lon=${lon}`);
+        if (!res.ok) throw new Error("Mimo pevninu");
+        const dataPudy = await res.json();
+
+        if (dataPudy.error) {
+            metaPanel.innerHTML = `<span style="color:#d32f2f;">${dataPudy.error}</span>`;
+            return;
+        }
+
+        metaPanel.innerHTML = `Půdní uzel HWSD2 ID: <b>${dataPudy.smu_id}</b>. Obsahuje <b>${dataPudy.komponenty.length}</b> půdní složky.`;
+
+        const tabMenu = document.createElement("div");
+        tabMenu.style.display = "flex"; tabMenu.style.gap = "4px"; tabMenu.style.margin = "0px 6px 5px 6px"; //tabMenu.style.borderBottom = "0px solid #ccc";
+        const tabObsahKontainer = document.createElement("div");
+
+        dataPudy.komponenty.forEach((komp, index) => {
+            const btn = document.createElement("button");
+            btn.innerText = `${Math.round(komp.share)} %`;
+            btn.style.width = "auto"; btn.style.background = index === 0 ? "#2e7d32" : "#aaa";
+             btn.style.boxShadow = index === 0 ? "rgba(46, 125, 50, 0.87) 0px 3px 5px, rgba(46, 125, 50, 0.36) 0px 5px 0px" : "none";
+            btn.style.padding = "8px 12px"; btn.style.border = "none"; btn.style.color = "white"; btn.style.cursor = "pointer";
+             btn.style.borderRadius = "4px 4px 0px 0px";btn.style.minWidth = "60px";
+
+            const obsah = document.createElement("div");
+            obsah.style.display = index === 0 ? "block" : "none";
+            obsah.style.padding = "6px"; obsah.style.border = "4px solid rgba(46, 125, 50, 0.5)"; obsah.style.borderRadius = "0 0 6px 6px"; obsah.style.background = "rgba(107, 142, 109, 0.06)"; obsah.style.borderRadius = "6px"; 
+
+            btn.onclick = () => {
+                Array.from(tabMenu.children).forEach(b => b.style.background = "#aaa",b => b.style.boxShadow = "none");
+                Array.from(tabMenu.children).forEach(b => b.style.boxShadow = "none");
+                Array.from(tabObsahKontainer.children).forEach(d => d.style.display = "none");
+                btn.style.background = "#2e7d32"; btn.style.boxShadow = "rgba(46, 125, 50, 0.87) 0px 3px 5px, rgba(46, 125, 50, 0.36) 0px 5px 0px";
+                obsah.style.display = "block";
+            };
+
+            const fFao = prelozKod("D_FAO90", komp.fao90);
+            const dDrain = prelozKod("D_DRAINAGE", komp.drainage);
+            const rDepthText = prelozKod("D_ROOT_DEPTH", komp.root_depth);
+
+            // Výchozí hodnoty pro simulátor infiltrace z vrstvy D1
+            let clay = 20, sand = 40, oc = 1.5;
+            if(komp.layers && komp.layers["D1"]) {
+                clay = parseFloat(komp.layers["D1"].clay) || 20;
+                sand = parseFloat(komp.layers["D1"].sand) || 40;
+                oc = parseFloat(komp.layers["D1"].oc) || 1.5;
+            }
+
+            // --- VÝPOČET HYDROLOGICKÉ INFILTRACE (Zjednodušená Saxton-Rawls rovnice) ---
+            // Základní infiltrace podle textury (písek vsakuje rychle, jíl pomalu)
+            let zakladniInfiltrace = 30.0; // mm/h pro hlinitou půdu
+            if (sand > 60) zakladniInfiltrace = 45.0 - (clay * 0.2); // Písčitá
+            else if (clay > 30) zakladniInfiltrace = 12.0 - (clay * 0.1); // Těžká jílovitá
+            else if (clay > 15 && sand < 30) zakladniInfiltrace = 18.0; // Prachová
+
+            // Vliv organického uhlíku (Humus lineárně zvyšuje zasakování a pórovitost)
+            const bonusHumus = oc * 4.5;
+            let vyslednaRychlost = zakladniInfiltrace + bonusHumus;
+            vyslednaRychlost = Math.max(1.5, Math.min(60.0, vyslednaRychlost)); // Limity fyzikálního maxima
+
+            if (index === 0) {
+                vypocitanaRychlostInfiltrace = vyslednaRychlost; // Uložíme pro dominantní složku
+            }
+
+            obsah.innerHTML = `
+                <div style="font-size: 14px; margin-bottom: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+                    <div><b>Půdní typ (FAO):</b> ${fFao}</div>
+                    <div><b>Odvodnění krajiny:</b> ${dDrain}</div>
+                    <div><b>Limit kořenů:</b> ${rDepthText}</div>
+                    <div><b>Vodní kapacita (AWC):</b> ${Math.round(komp.awc_total)} mm/m</div>
+                </div>
+                <div style="padding: 0px; margin-bottom: 15px; font-size: 14px;">
+                    Půda na tomto místě dokáže simultárně vsáknout maximálně <b>${vyslednaRychlost.toFixed(1)} mm srážek za hodinu</b>. 
+                    ${vyslednaRychlost < 10 ? ' <span style="color:#d32f2f; font-weight:bold;">⚠️ Vysoké riziko bleskových povodní a povrchového odtoku při bouřkách! Nutné agrolesnické průlehy.</span>' : '<span style="color:#2e7d32;"> Dobrá vsakovací schopnost půdního profilu. ✅ </span>'}
+                </div>
+            `;
+
+            // Tabulka vrstev
+            const vrstvyKys = Object.keys(komp.layers).sort();
+            if (vrstvyKys.length > 0) {
+                let tabHtml = `<table class="pudni-tabulka"><thead><tr><th>Vrstva</th><th>Hloubka</th><th>Jíl</th><th>Písek</th><th>Prach</th><th>Humus</th><th>pH</th></tr></thead><tbody>`;
+                vrstvyKys.forEach(vKey => {
+                    const l = komp.layers[vKey];
+                    const phVycistene = parseFloat(l.ph).toFixed(1);
+                    const ocVycistene = parseFloat(l.oc).toFixed(2);
+                    
+                    tabHtml += `<tr>
+                        <td style="font-weight:bold;">${vKey}</td><td>${l.top}–${l.bot} cm</td>
+                        <td style="color:#b71c1c; font-weight:bold;">${Math.round(l.clay)} %</td><td>${Math.round(l.sand)} %</td><td>${Math.round(l.silt)} %</td>
+                        <td>${ocVycistene} %</td><td style="background:${phVycistene < 6.0 ? '#ffe0b2' : '#e8f5e9'}; font-weight:bold;">${phVycistene}</td>
+                    </tr>`;
+                });
+                tabHtml += `</tbody></table>`;
+                obsah.innerHTML += tabHtml;
+            }
+
+            tabMenu.appendChild(btn);
+            tabObsahKontainer.appendChild(obsah);
+        });
+
+        kontainer.appendChild(tabMenu);
+        kontainer.appendChild(tabObsahKontainer);
+    } catch (err) {
+        metaPanel.innerHTML = `<i>Půdní profil: ${err.message}</i>`;
+    }
+}
+
+// 3. VÝKONNOSTNĚ OPTIMALIZOVANÁ MAPOVÁ VRSTVA S KONTROLOU ZOOMU
+function prekresliPudniVrstvu() {
+    const vlastnost = document.getElementById("puda_vrstva_vlastnost").value;
+    const opacity = parseFloat(document.getElementById("puda_vrstva_opacity").value);
+    const legPanel = document.getElementById("mapa-legenda");
+    const legBarvy = document.getElementById("legenda-barvy");
+    const opacuty1 = document.getElementById("puda_opacity");
+
+    if (puzniTileLayerLeaflet) { map.removeLayer(puzniTileLayerLeaflet); puzniTileLayerLeaflet = null; }
+    legBarvy.innerHTML = "";
+
+    if (vlastnost === "NONE") { legPanel.style.display = "none"; opacuty1.style.display = "none"; return; }
+    
+    // VÝKONNOSTNÍ POJISTKA: Pokud je zoom příliš malý, vrstvu vůbec nezapínáme
+    if (map.getZoom() < 15) {
+        legPanel.style.display = "flex"; opacuty1.style.display = "none";
+        document.getElementById("legenda-titulek").innerHTML = "<span style='color:#d32f2f;'>⚠️ Vrstva půd je vypnuta. Pro zobrazení mapy se nejprve přibližte blíž k detailu (Zoom 15+, současný zoom je "+map.getZoom()+").</span>";
+        return;
+    }
+    
+    legPanel.style.display = "block"; opacuty1.style.display = "block";
+
+    let legendySkaly = [];
+    if (vlastnost === "PH") {
+        document.getElementById("legenda-titulek").innerText = 'Legenda: pH ornice';
+        legendySkaly = [
+            { min: 0,   max: 5.2, barva: "rgb(211, 47, 47)",  t: "Silně kyselá <br>(< 5.2)" },
+            { min: 5.2, max: 6.2, barva: "rgb(255, 152, 0)",  t: "Mírně kyselá <br>(5.2 - 6.2)" },
+            { min: 6.2, max: 7.0, barva: "rgb(255, 235, 59)",  t: "Slabě kyselá / Neutrální <br>(6.2 - 7)" },
+            { min: 7.0, max: 14.0,barva: "rgb(46, 125, 50)",   t: "Zásaditá <br>(> 7.0)" }
+        ];
+    } else if (vlastnost === "CLAY") {
+        document.getElementById("legenda-titulek").innerText = "Legenda: Podíl jílu v ornici (%)";
+        legendySkaly = [
+            { min: 0,   max: 15,  barva: "rgb(225, 190, 231)", t: "Lehká písčitá <br>(< 15 %)" },
+            { min: 15,  max: 30,  barva: "rgb(186, 104, 200)", t: "Střední hlinitá <br>(15 - 30 %)" },
+            { min: 30,  max: 100, barva: "rgb(106, 27, 154)",  t: "Těžká jílovitá <br>(> 30 %)" }
+        ];
+    } else if (vlastnost === "OC") {
+        document.getElementById("legenda-titulek").innerText = "Legenda: Organický uhlík v ornici (%)";
+        legendySkaly = [
+            { min: 0,   max: 1.0, barva: "rgb(215, 204, 200)", t: "Slabá půda <br>(< 1.0 %)" },
+{ min: 1.0, max: 2.2, barva: "rgb(141, 110, 99)",  t: "Běžná ornice <br>(1.0 - 2.2 %)" },
+{ min: 2.2, max: 10.0,barva: "rgb(62, 39, 35)",    t: "Bohatá humusová <br>(> 2.2 %)" }
+];
+}
+legendySkaly.forEach(l => {
+legBarvy.innerHTML += `<div style="text-align: center; grid-column: span 1; align-items:center; margin-right:15px; margin-top:5px;"><div style="width:20px; height:15px; background:${l.barva}; margin:5px auto 0px auto; border:1px solid #aaa;"></div><span>${l.t}</span></div>`;
+});
+puzniTileLayerLeaflet = L.gridLayer({ opacity: opacity, tileSize: 256 });
+puzniTileLayerLeaflet.createTile = function(coords) {
+const tile = L.DomUtil.create('canvas', 'leaflet-tile');
+const ctx = tile.getContext('2d');
+tile.width = this.options.tileSize;
+tile.height = this.options.tileSize;
+// MATEMATICKÁ KOREKCE: Vykreslujeme pouze body, které spadají do aktuálního okna
+const krok = 128;// 64 96 128  192 160 256
+setTimeout(async () => {
+// Kontrola, zda se uživatel během načítání neoddálil pryč
+if (map.getZoom() < 15) return;
+for (let y = 0; y < 256; y += krok) {
+for (let x = 0; x < 256; x += krok) {
+// Přepočet přesných souřadnic pro KAŽDÝ sub-pixel zvlášť na základě aktuálního zoomu
+const gPoint = map.unproject([coords.x * 256 + x, coords.y * 256 + y], coords.z);
+try {
+const res = await fetch(`get_soil.php?lat=${gPoint.lat.toFixed(4)}&lon=${gPoint.lng.toFixed(4)}`);
+if(!res.ok) continue;
+const p = await res.json();
+if(p.error || !p.komponenty || p.komponenty.length === 0) continue;
+const d1 = p.komponenty[0].layers["D1"]; // Čteme dominantní složku
+if(!d1) continue;
+let pixelColor = "transparent";
+if (vlastnost === "PH") {
+const ph = parseFloat(d1.ph);
+const match = legendySkaly.find(l => ph >= l.min && ph < l.max);
+if(match) pixelColor = match.barva;
+} else if (vlastnost === "CLAY") {
+const clay = parseFloat(d1.clay);
+const match = legendySkaly.find(l => clay >= l.min && clay < l.max);
+if(match) pixelColor = match.barva;
+} else if (vlastnost === "OC") {
+const oc = parseFloat(d1.oc);
+const match = legendySkaly.find(l => oc >= l.min && oc < l.max);
+if(match) pixelColor = match.barva;
+}
+ctx.fillStyle = pixelColor;
+ctx.fillRect(x, y, krok, krok);
+} catch(e) {}
+}
+}
+}, 0);
+return tile;
+};
+puzniTileLayerLeaflet.addTo(map);
+}
+// Globální posluchač: Když uživatel kolečkem myši změní přiblížení mapy, zkontrolujeme limity výkonu
+map.on('zoomend', function() {
+const vlastnost = document.getElementById("puda_vrstva_vlastnost").value;
+if (vlastnost !== "NONE") {
+prekresliPudniVrstvu(); // Automaticky vypne nebo zapne mapu podle nového zoomu
+}
+});
+
+					
+							
+
+function upravPrůhlednostVrstvy() {
+    if (puzniTileLayerLeaflet) {
+        const opacity = parseFloat(document.getElementById("puda_vrstva_opacity").value);
+        puzniTileLayerLeaflet.setOpacity(opacity);
+    }
+}
+
+    
+</script>
+
+
+</body>
+</html>

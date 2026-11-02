@@ -1,0 +1,794 @@
+
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Asynchronní Slučovač</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f6f8;
+        }
+        h1, h2, h3 { color: #1a202c; }
+        .card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        .btn {
+            background-color: #3182ce;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+            transition: background 0.2s;
+        }
+        .btn:hover { background-color: #2b6cb0; }
+        .btn-danger { background-color: #e53e3e; }
+        .btn-danger:hover { background-color: #c53030; }
+        .btn-success { background-color: #38a169; }
+        .btn-success:hover { background-color: #2f855a; }
+        .btn-secondary { background-color: #718096; }
+        .btn-secondary:hover { background-color: #4a5568; }
+        .btn-col { background-color: #edf2f7; color: #2d3748; border: 1px solid #cbd5e0; }
+        .btn-col.active { background-color: #3182ce; color: white; border-color: #3182ce; }
+        
+        /* Kontrolní logovací okno */
+        #log-window {
+            background-color: #1a202c;
+            color: #48bb78;
+            font-family: "Courier New", Courier, monospace;
+            padding: 15px;
+            height: 180px;
+            overflow-y: scroll;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+        .log-err { color: #f56565; }
+        .log-in { color: #63b3ed; }
+        .log-out { color: #ecc94b; }
+
+        /* Konfigurace souborů a sloupců */
+        .file-config-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            flex-wrap: wrap;
+        }
+        .column-buttons { display: inline-block; margin-top: 5px; }
+        .seq-input { width: 50px; padding: 5px; text-align: center; margin-left: 10px; }
+
+        /* Řešení duplicit a editory */
+        .duplicate-item, .row-edit-item {
+            display: flex;
+            align-items: center;
+            background: #fffaf0;
+            border: 1px solid #feebc8;
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+        }
+        .txt-edit { flex-grow: 1; padding: 6px; margin: 0 10px; font-family: monospace; border: 1px solid #cbd5e0; border-radius: 4px; }
+        
+        /* Matice unikátních hodnot */
+        .unique-container {
+            display: flex;
+            overflow-x: auto;
+            gap: 15px;
+            padding-bottom: 10px;
+        }
+        .unique-column-box {
+            background: #edf2f7;
+            min-width: 200px;
+            max-width: 300px;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .unique-column-title { font-weight: bold; text-align: center; border-bottom: 2px solid #cbd5e0; margin-bottom: 8px; padding-bottom: 4px; }
+        .unique-list { max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+        .btn-val { text-align: left; background: white; border: 1px solid #e2e8f0; padding: 5px; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap;/* overflow: hidden;*/ text-overflow: ellipsis; }
+        .btn-val:hover { background: #e2e8f0; }
+
+        .hidden { display: none; }
+        .controls-bar { margin-top: 10px; display: flex; gap: 10px; }
+        #preview-area { white-space: pre; font-family: monospace; background: #edf2f7; padding: 15px; max-height: 300px; overflow: auto; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+  
+    <h1>Asynchronní Slučovač CSV Tabulek</h1>
+
+    <!-- 1. KROK: Načtení souborů a Logování -->
+    <div class="card">
+        <h2>1. Monitor procesu & Vstup</h2>
+        <div id="log-window"></div>
+        <div class="controls-bar">
+            <button class="btn" id="btn-select-files">Vybrat CSV soubory</button>
+            <input type="file" id="file-input" multiple accept=".csv" class="hidden">
+            <button class="btn btn-secondary hidden" id="btn-pause">Pozastavit</button>
+            <button class="btn btn-success hidden" id="btn-resume">Pokračovat</button>
+        </div>
+    </div>
+
+    <!-- 2. KROK: Nastavení vazeb a posloupnosti -->
+    <div class="card hidden" id="sec-config">
+        <h2>2. Nastavení sloupců a posloupnosti spojování</h2>
+        <p><small>Kliknutím na sloupec vyberte společný indexový sloupec. Do textového pole zadejte pořadí spojování (1, 2, 3...).</small></p>
+        <div id="file-options-container"></div>
+        <div class="controls-bar" style="margin-top: 15px;">
+            <button class="btn btn-success hidden" id="btn-config-done">Hotovo – Spustit indexaci</button>
+        </div>
+    </div>
+
+    <!-- 3. KROK: Interaktivní řešení duplicit -->
+    <div class="card hidden" id="sec-duplicates">
+        <h2>3. Nalezené duplicity v indexu</h2>
+        <p>V jednom nebo více souborech se vyskytuje stejný index na více řádcích. Upravte data a potvrďte uložení:</p>
+        <div id="duplicates-container"></div>
+    </div>
+
+    <!-- 4. KROK: Úprava unikátních hodnot -->
+    <div class="card hidden" id="sec-uniques">
+        <h2>4. Přehled unikátních hodnot podle sloupců</h2>
+        <p><small>Kliknutím na hodnotu vyvoláte možnost editace nebo smazání celého řádku z dané tabulky.</small></p>
+        <div class="unique-container" id="uniques-container"></div>
+        
+        <!-- Pod-okno pro editaci konkrétního řádku vybraného přes unikátní hodnotu -->
+        <div id="row-editor-zone" class="hidden" style="margin-top: 15px; padding: 15px; background: #e2e8f0; border-radius: 6px;">
+            <h3>Úprava vybraného řádku</h3>
+            <div id="row-editor-container"></div>
+        </div>
+        
+        <div class="controls-bar" style="margin-top: 20px;">
+            <button class="btn btn-success" id="btn-merge-start">Sloučit tabulky</button>
+        </div>
+    </div>
+
+    <!-- 5. KROK: Výsledek -->
+    <div class="card hidden" id="sec-result">
+        <h2>5. Výsledná tabulka</h2>
+        <div class="controls-bar" style="margin-bottom: 15px;">
+            <button class="btn btn-success" id="btn-download">Stáhnout výsledné CSV</button>
+        </div>
+        <h3>Náhled:</h3>
+        <div id="preview-area"></div>
+    </div>
+
+    <!-- Zde budou připojeny skripty (dávka 2 a 3) -->
+    <script>
+        
+        // Globální stav aplikace
+const AppState = {
+    files: [],            // Pole objektů pro každý soubor { name, lines: [[]], targetKeyIndex: 0, sequence: 1 }
+    isPaused: false,
+    currentTask: null,    // Ukazatel na aktuálně běžící asynchronní generátor
+    logWindow: null,
+    
+    // Asynchronní pomocník pro spuštění procesů po krocích (Time-slicing)
+    async runChunked(generator) {
+        this.currentTask = generator;
+        while (true) {
+            if (this.isPaused) {
+                this.log("Proces pozastaven uživatelem.", "out");
+                return false;
+            }
+            const { value, done } = generator.next();
+            if (done) break;
+            // Předání řízení prohlížeči, aby stihl vykreslit UI a nezamrzl (každý krok trvá 0 ms v event loopu)
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+        this.currentTask = null;
+        return true;
+    },
+
+    log(message, type = "process") {
+        if (!this.logWindow) this.logWindow = document.getElementById("log-window");
+        const time = new Date().toLocaleTimeString();
+        let className = "";
+        if (type === "err") className = "log-err";
+        if (type === "in") className = "log-in";
+        if (type === "out") className = "log-out";
+        
+        this.logWindow.innerHTML += `<div class="${className}">[${time}] ${message}</div>`;
+        this.logWindow.scrollTop = this.logWindow.scrollHeight;
+    }
+};
+
+// Inicializace prvků po načtení stránky
+document.addEventListener("DOMContentLoaded", () => {
+    const fileInput = document.getElementById("file-input");
+    const btnSelect = document.getElementById("btn-select-files");
+    const btnPause = document.getElementById("btn-pause");
+    const btnResume = document.getElementById("btn-resume");
+    const btnConfigDone = document.getElementById("btn-config-done");
+
+    btnSelect.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", handleFileSelection);
+    
+    btnPause.addEventListener("click", () => {
+        AppState.isPaused = true;
+        btnPause.classList.add("hidden");
+        btnResume.classList.remove("hidden");
+    });
+
+    btnResume.addEventListener("click", async () => {
+        AppState.isPaused = false;
+        btnResume.classList.add("hidden");
+        btnPause.classList.remove("hidden");
+        AppState.log("Obnovuji proces...", "process");
+        if (AppState.currentTask) {
+            await AppState.runChunked(AppState.currentTask);
+        }
+    });
+
+    btnConfigDone.addEventListener("click", startIndexingProcess);
+});
+
+// 1. KROK: Asynchronní načtení vybraných souborů
+function handleFileSelection(e) {
+    const fileList = e.target.files;
+    if (fileList.length === 0) return;
+
+    AppState.files = [];
+    AppState.log(`Uživatel vybral ${fileList.length} souborů. Zahajuji čtení...`, "in");
+    
+    let loadedCount = 0;
+    Array.from(fileList).forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            const text = evt.target.result;
+            // Rozdělení na řádky a následně podle středníků na sloupce
+            const lines = text.split(/\r?\n/).filter(line => line.trim() !== "").map(line => line.split(";"));
+            
+            AppState.files.push({
+                id: index,
+                name: file.name,
+                lines: lines,
+                targetKeyIndex: 0, // Výchozí index pro spojování je 1. sloupec
+                sequence: index + 1 // Výchozí posloupnost
+            });
+
+            AppState.log(`Načten soubor: ${file.name} (${lines.length} řádků)`, "process");
+            loadedCount++;
+            
+            if (loadedCount === fileList.length) {
+                AppState.log("Všechny soubory jsou v paměti.", "success");
+                renderConfigurationUI();
+            }
+        };
+        reader.readAsText(file);
+    });
+}
+
+// 2. KROK: Vykreslení výběru sloupců a pořadí
+function renderConfigurationUI() {
+    const container = document.getElementById("file-options-container");
+    container.innerHTML = "";
+    
+    AppState.files.forEach(file => {
+        const firstRow = file.lines[0] || [];
+        const rowDiv = document.createElement("div");
+        rowDiv.className = "file-config-row";
+        
+        let html = `<strong>${file.name}</strong><div class="column-buttons">`;
+        firstRow.forEach((colName, colIdx) => {
+            const isActive = colIdx === file.targetKeyIndex ? "active" : "";
+            html += `<button class="btn btn-col ${isActive}" data-file-id="${file.id}" data-col-idx="${colIdx}">${colName || `Sloupec ${colIdx+1}`}</button>`;
+        });
+        html += `</div>`;
+        html += `<div>Pořadí: <input type="number" class="seq-input" data-file-id="${file.id}" value="${file.sequence}" min="1"></div>`;
+        
+        rowDiv.innerHTML = html;
+        container.appendChild(rowDiv);
+    });
+
+    // Event listenery pro výběr hlavního klíče
+    container.querySelectorAll(".btn-col").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            const fileId = parseInt(e.target.getAttribute("data-file-id"));
+            const colIdx = parseInt(e.target.getAttribute("data-col-idx"));
+            
+            const file = AppState.files.find(f => f.id === fileId);
+            file.targetKeyIndex = colIdx;
+            
+            // Překreslení aktivní třídy v daném řádku
+            e.target.parentElement.querySelectorAll(".btn-col").forEach(b => b.classList.remove("active"));
+            e.target.classList.add("active");
+            AppState.log(`Změněn spojovací sloupec pro ${file.name} na index ${colIdx}`, "process");
+        });
+    });
+
+    // Sledování změn v pořadí (posloupnosti)
+    container.querySelectorAll(".seq-input").forEach(input => {
+        input.addEventListener("change", (e) => {
+            const fileId = parseInt(e.target.getAttribute("data-file-id"));
+            const val = parseInt(e.target.value) || 1;
+            const file = AppState.files.find(f => f.id === fileId);
+            file.sequence = val;
+        });
+    });
+
+    document.getElementById("sec-config").classList.remove("hidden");
+    document.getElementById("btn-config-done").classList.remove("hidden");
+}
+
+// 3. KROK: Spuštění indexace a asynchronní kontrola duplicit
+async function startIndexingProcess() {
+    document.getElementById("btn-pause").classList.remove("hidden");
+    AppState.log("Zahajuji kontrolu vnitřních duplicit v souborech...", "process");
+    
+    // Spuštění generátoru zpracování dat
+    const success = await AppState.runChunked(indexationGenerator());
+    if (success) {
+        AppState.log("Indexace a kontrola duplicit dokončena.", "success");
+        // Předání řízení do další fáze (bude v Části 2)
+        if (typeof buildUniquesMatrix === "function") {
+            buildUniquesMatrix();
+        }
+    }
+}
+
+// Asynchronní generátor pro zpracování řádků (Time-slicing)
+function* indexationGenerator() {
+    for (let fIdx = 0; fIdx < AppState.files.length; fIdx++) {
+        const file = AppState.files[fIdx];
+        const indexedData = new Map(); // Dočasná mapa pro kontrolu duplicit v jednom souboru
+        const duplicateGroups = {};    // ID klíče -> pole řádků
+        
+        AppState.log(`Analyzuji řádky v souboru: ${file.name}`, "process");
+        
+        // Začínáme od indexu 1 (druhý řádek – přeskočení hlavičky)
+        for (let rIdx = 1; rIdx < file.lines.length; rIdx++) {
+            const row = file.lines[rIdx];
+            if (!row || row.length === 0 || (row.length === 1 && row[0] === "")) continue;
+            
+            const key = row[file.targetKeyIndex];
+            
+            if (indexedData.has(key)) {
+                if (!duplicateGroups[key]) {
+                    duplicateGroups[key] = [indexedData.get(key)];
+                }
+                duplicateGroups[key].push({ rowIndex: rIdx, data: row });
+            } else {
+                indexedData.set(key, { rowIndex: rIdx, data: row });
+            }
+            
+            // Každých 500 řádků uvolníme procesor na okamžik
+            if (rIdx % 500 === 0) {
+                yield;
+            }
+        }
+        
+        // Pokud byly nalezeny duplicity, vyvoláme jejich řešení uživatelem
+        const dupKeys = Object.keys(duplicateGroups);
+        if (dupKeys.length > 0) {
+            AppState.log(`Nalezeno ${dupKeys.length} duplicitních klíčů v ${file.name}! Vyžadováno schválení.`, "err");
+            renderDuplicateResolutionUI(file, duplicateGroups);
+            AppState.isPaused = true; // Zastavíme automatický průběh, čeká se na uživatele
+            yield;
+        }
+    }
+}
+
+// Vykreslení formuláře pro řešení duplicit
+function renderDuplicateResolutionUI(file, duplicateGroups) {
+    const secDup = document.getElementById("sec-duplicates");
+    secDup.classList.remove("hidden");
+    const container = document.getElementById("duplicates-container");
+    
+    const block = document.createElement("div");
+    block.style.marginBottom = "20px";
+    block.innerHTML = `<h3>Soubor: ${file.name}</h3>`;
+    
+    Object.keys(duplicateGroups).forEach(key => {
+        const groupDiv = document.createElement("div");
+        groupDiv.style.borderLeft = "4px solid #dd6b20";
+        groupDiv.style.paddingLeft = "10px";
+        groupDiv.style.marginBottom = "15px";
+        groupDiv.innerHTML = `<p>Duplicitní klíč: <strong>${key}</strong></p>`;
+        
+duplicateGroups[key].forEach((item, index) => {
+    const itemRow = document.createElement("div");
+    itemRow.className = "duplicate-item";
+    
+    const isChecked = index === 0 ? "checked" : ""; // Výchozí zaškrtnutí prvního
+    const rowText = item.data.join(";");
+    
+    itemRow.innerHTML = `
+        <input type="checkbox" class="dup-chk" data-row-idx="${item.rowIndex}" ${isChecked}>
+        <input type="text" class="txt-edit dup-txt" data-row-idx="${item.rowIndex}" value="${rowText}">
+    `;
+    groupDiv.appendChild(itemRow);
+});
+
+const saveBtn = document.createElement("button");
+saveBtn.className = "btn btn-success";
+saveBtn.innerText = "Uložit vybrané řádky";
+saveBtn.onclick = function() {
+// Zpracování upravených a zaškrtnutých dat zpět do souboru
+const checkedInputs = groupDiv.querySelectorAll(".dup-chk");
+const linesToRemove = [];
+checkedInputs.forEach(chk => {
+const rIdx = parseInt(chk.getAttribute("data-row-idx"));
+const txtInput = groupDiv.querySelector(`.dup-txt[data-row-idx="${rIdx}"]`);
+
+if (chk.checked) {
+file.lines[rIdx] = txtInput.value.split(";"); // Uložení změn
+} else {
+linesToRemove.push(rIdx); // Označení ke smazání
+}
+});
+// Odstranění nezaškrtnutých řádků (odzadu, aby se nerozházely indexy)
+linesToRemove.sort((a, b) => b - a).forEach(rIdx => {
+file.lines.splice(rIdx, 1);
+});
+AppState.log('Duplicity pro klíč "${key}" byly vyřešeny., "process"');
+groupDiv.remove();
+if (container.children.length === 0 || (container.children.length === 1 && container.firstChild.children.length <= 1)) {
+secDup.classList.add("hidden");
+// Automatické kliknutí na pokračovat
+document.getElementById("btn-resume").click();
+}
+};
+groupDiv.appendChild(saveBtn);
+block.appendChild(groupDiv);
+});
+container.appendChild(block);
+// Skryjeme tlačítko pauzy, protože UI si vynutilo pauzu samo
+document.getElementById("btn-pause").classList.add("hidden");
+document.getElementById("btn-resume").classList.remove("hidden");
+}
+  
+  
+  // 4. KROK: Sestavení matice unikátních hodnot
+function buildUniquesMatrix() {
+    AppState.log("Vytvářím seznam unikátních hodnot pro jednotlivé sloupce...", "process");
+    const container = document.getElementById("uniques-container");
+    container.innerHTML = "";
+    
+    // Projdeme soubory v pořadí, v jakém byly definovány
+    AppState.files.forEach(file => {
+        const header = file.lines[0] || [];
+        
+        header.forEach((colName, colIdx) => {
+            const columnBox = document.createElement("div");
+            columnBox.className = "unique-column-box";
+            
+            const title = document.createElement("div");
+            title.className = "unique-column-title";
+            title.innerText = `${file.name}\n[${colName || `Sloupec \${colIdx+1}`}]`;
+            columnBox.appendChild(title);
+            
+            const listDiv = document.createElement("div");
+            listDiv.className = "unique-list";
+            
+            // Posbíráme unikátní hodnoty v tomto konkrétním sloupci (od 2. řádku dál)
+            const uniqueValuesMap = new Map(); // hodnota -> pole indexů řádků, kde se nachází
+            
+            for (let rIdx = 1; rIdx < file.lines.length; rIdx++) {
+                const row = file.lines[rIdx];
+                if (!row || row.length <= colIdx) continue;
+                const val = row[colIdx];
+                if (val !== undefined && val.trim() !== "") {
+                    if (!uniqueValuesMap.has(val)) {
+                        uniqueValuesMap.set(val, []);
+                    }
+                    uniqueValuesMap.get(val).push(rIdx);
+                }
+            }
+            
+            // Vykreslení unikátních hodnot jako tlačítek
+            uniqueValuesMap.forEach((rowIndices, val) => {
+                const btnVal = document.createElement("button");
+                btnVal.className = "btn-val";
+                btnVal.title = val;
+                btnVal.innerText = val;
+                
+                btnVal.addEventListener("click", () => {
+                    openRowEditor(file, rowIndices, val);
+                });
+                
+                listDiv.appendChild(btnVal);
+            });
+            
+            columnBox.appendChild(listDiv);
+            container.appendChild(columnBox);
+        });
+    });
+    
+    document.getElementById("sec-uniques").classList.remove("hidden");
+    // Navázání akce na finální sloučení tabulek
+    document.getElementById("btn-merge-start").onclick = processFinalMerge;
+}
+
+// Otevření editoru řádku při kliknutí na unikátní hodnotu
+function openRowEditor(file, rowIndices, targetValue) {
+    const zone = document.getElementById("row-editor-zone");
+    const container = document.getElementById("row-editor-container");
+    zone.classList.remove("hidden");
+    container.innerHTML = "";
+    
+    AppState.log(`Otevřen editor pro hodnotu "${targetValue}" v souboru ${file.name}`, "in");
+    
+    rowIndices.forEach(rIdx => {
+        const rowData = file.lines[rIdx];
+        if (!rowData) return;
+        
+        const editItem = document.createElement("div");
+        editItem.className = "row-edit-item";
+        editItem.id = `edit-item-${file.id}-${rIdx}`;
+        
+        const txtInput = document.createElement("input");
+        txtInput.type = "text";
+        txtInput.className = "txt-edit";
+        txtInput.value = rowData.join(";");
+        
+        const btnSave = document.createElement("button");
+        btnSave.className = "btn btn-success";
+        btnSave.innerText = "Uložit";
+        btnSave.onclick = function() {
+            file.lines[rIdx] = txtInput.value.split(";");
+            AppState.log(`Řádek ${rIdx} v ${file.name} byl upraven a uložen.`, "process");
+            buildUniquesMatrix(); // Přegenerujeme matici kvůli změnám
+            zone.classList.add("hidden");
+        };
+        
+        const btnDelete = document.createElement("button");
+        btnDelete.className = "btn btn-danger";
+        btnDelete.innerText = "Odstranit řádek";
+        btnDelete.onclick = function() {
+            file.lines.splice(rIdx, 1);
+            AppState.log(`Řádek ${rIdx} byl ze souboru ${file.name} odstraněn.`, "out");
+            buildUniquesMatrix(); // Přegenerujeme matici
+            zone.classList.add("hidden");
+        };
+        
+        editItem.appendChild(txtInput);
+        editItem.appendChild(btnSave);
+        editItem.appendChild(btnDelete);
+        container.appendChild(editItem);
+    });
+}
+
+// 5. KROK: Finální sloučení (JOIN) a Export dat
+// 5. KROK: Finální sloučení (JOIN) s řešením konfliktů hodnot
+async function processFinalMerge() {
+    AppState.log("Zahajuji proces spojování tabulek podle určené posloupnosti...", "process");
+    document.getElementById("btn-pause").classList.remove("hidden");
+    
+    const sortedFiles = [...AppState.files].sort((a, b) => a.sequence - b.sequence);
+    if (sortedFiles.length === 0) {
+        AppState.log("Chyba: Žádné soubory k dispozici.", "err");
+        return;
+    }
+    
+    // Posbírat unikátní indexy
+    const masterKeysSet = new Set();
+    sortedFiles.forEach(file => {
+        for (let i = 1; i < file.lines.length; i++) {
+            const row = file.lines[i];
+            if (row && row.length > file.targetKeyIndex) {
+                const key = row[file.targetKeyIndex].trim();
+                if (key !== "") masterKeysSet.add(key);
+            }
+        }
+    });
+    const masterKeys = Array.from(masterKeysSet);
+    
+    // Vytvořit rychlé indexové mapy
+    const fileLookupMaps = sortedFiles.map(file => {
+        const lookup = new Map();
+        for (let i = 1; i < file.lines.length; i++) {
+            const row = file.lines[i];
+            if (row && row.length > file.targetKeyIndex) {
+                lookup.set(row[file.targetKeyIndex].trim(), row);
+            }
+        }
+        return { file, lookup };
+    });
+    
+    // Sestavení unikátních názvů sloupců (pokud jsou identické, sjednotíme je do jednoho)
+    let globalColumnHeaders = ["Společný_Klíč"];
+    let columnSourceMap = []; // Mapa určující: { fileId, origColIdx, globalColIdx }
+    
+    fileLookupMaps.forEach(({ file }) => {
+        const origHeader = file.lines[0] || [];
+        origHeader.forEach((colName, colIdx) => {
+            if (colIdx === file.targetKeyIndex) return; // vynechat klíč
+            
+            // Hledáme, zda už sloupec s tímto názvem v nové tabulce existuje
+            let existingIdx = globalColumnHeaders.indexOf(colName);
+            if (existingIdx === -1 || !colName) {
+                // Nový unikátní sloupec
+                globalColumnHeaders.push(colName || `Sloupec_${file.name}_${colIdx+1}`);
+                existingIdx = globalColumnHeaders.length - 1;
+            }
+            
+            columnSourceMap.push({
+                fileId: file.id,
+                fileName: file.name,
+                origColIdx: colIdx,
+                globalColIdx: existingIdx,
+                colName: colName
+            });
+        });
+    });
+    
+    const resultRows = [globalColumnHeaders];
+    const conflictsToResolve = []; // Ukládání konfliktů ke schválení: { key, globalColIdx, colName, options: [ { fileName, value } ] }
+
+    // Generátor pro JOIN a detekci konfliktů hodnot v identických sloupcích
+    const mergeGenerator = function* () {
+        for (let k = 0; k < masterKeys.length; k++) {
+            const currentKey = masterKeys[k];
+            // Předvyplníme řádek prázdnými hodnotami (index 0 je klíč)
+            let combinedRow = Array(globalColumnHeaders.length).fill("");
+            combinedRow[0] = currentKey;
+            
+            // Dočasná struktura pro sledování, jaké hodnoty pro jaký globální sloupec přišly
+            // globalColIdx -> { value: [ { fileName, val } ] }
+            let valuesPerColumn = {};
+            
+            fileLookupMaps.forEach(({ file, lookup }) => {
+                const matchedRow = lookup.get(currentKey);
+                if (!matchedRow) return;
+                
+                // Najdeme všechny mapování pro tento soubor
+                const mappings = columnSourceMap.filter(m => m.fileId === file.id);
+                mappings.forEach(map => {
+                    const val = matchedRow[map.origColIdx];
+                    if (val !== undefined && val.trim() !== "") {
+                        if (!valuesPerColumn[map.globalColIdx]) {
+                            valuesPerColumn[map.globalColIdx] = [];
+                        }
+                        // Uložíme hodnotu a zdroj, abychom poznali případný konflikt
+                        valuesPerColumn[map.globalColIdx].push({ fileName: file.name, val: val.trim() });
+                    }
+                });
+            });
+            
+            // Vyhodnocení hodnot a detekce konfliktů
+            Object.keys(valuesPerColumn).forEach(gIdx => {
+                const sources = valuesPerColumn[gIdx];
+                const uniqueVals = Array.from(new Set(sources.map(s => s.val)));
+                
+                if (uniqueVals.length === 1) {
+                    // Všechny tabulky se shodují, zapíšeme hodnotu
+                    combinedRow[gIdx] = uniqueVals[0];
+                } else if (uniqueVals.length > 1) {
+                    // DETEKOVÁN KONFLIKT: Stejný sloupec, stejný klíč, ale jiné hodnoty napříč CSV
+                    conflictsToResolve.push({
+                        key: currentKey,
+                        globalColIdx: parseInt(gIdx),
+                        colName: globalColumnHeaders[gIdx],
+                        sources: sources, // Seznam všech odlišných variant [{fileName, val}]
+                        targetRowRef: combinedRow // Referenční vazba pro pozdější zápis
+                    });
+                }
+            });
+            
+            resultRows.push(combinedRow);
+            if (k % 400 === 0) yield;
+        }
+    };
+    
+    const success = await AppState.runChunked(mergeGenerator());
+    
+    if (success) {
+        if (conflictsToResolve.length > 0) {
+            AppState.log(`Nalezeno ${conflictsToResolve.length} konfliktů v hodnotách identických sloupců. Vyžadováno schválení.`, "err");
+            renderValueConflictUI(conflictsToResolve, resultRows);
+        } else {
+            finalizeMergeOutput(resultRows);
+        }
+    }
+}
+
+// Vykreslení rozhraní pro vyřešení odlišných hodnot v identických sloupcích
+function renderValueConflictUI(conflicts, resultRows) {
+    const secDup = document.getElementById("sec-duplicates");
+    secDup.classList.remove("hidden");
+    const container = document.getElementById("duplicates-container");
+    container.innerHTML = "<h3>Řešení konfliktů hodnot v identických sloupcích</h3>";
+    
+    conflicts.forEach((conflict, cIdx) => {
+        const groupDiv = document.createElement("div");
+        groupDiv.style.borderLeft = "4px solid #e53e3e";
+        groupDiv.style.paddingLeft = "10px";
+        groupDiv.style.marginBottom = "15px";
+        groupDiv.style.background = "#fff5f5";
+        groupDiv.innerHTML = `<p>Společný klíč: <strong>${conflict.key}</strong> | Sloupec: <strong>${conflict.colName}</strong></p>`;
+        
+        conflict.sources.forEach((source, sIdx) => {
+            const itemRow = document.createElement("div");
+            itemRow.className = "duplicate-item";
+            
+            const isChecked = sIdx === 0 ? "checked" : "";
+            
+            itemRow.innerHTML = `
+                <input type="radio" name="conflict-rad-${cIdx}" class="conflict-rad" data-val="${source.val}" ${isChecked}>
+                <span style="font-size:12px; color:#555; margin-right:10px;">[${source.fileName}]:</span>
+                <input type="text" class="txt-edit conflict-txt" value="${source.val}">
+            `;
+            groupDiv.appendChild(itemRow);
+        });
+        
+        const saveBtn = document.createElement("button");
+        saveBtn.className = "btn btn-success";
+        saveBtn.innerText = "Potvrdit hodnotu";
+        saveBtn.onclick = function() {
+            // Zjistíme, který řádek (radio) nebo upravený text byl zvolen
+            const selectedRadio = groupDiv.querySelector(`.conflict-rad:checked`);
+            const textInput = selectedRadio.parentElement.querySelector(".conflict-txt");
+            
+            // Zapíšeme finální vybranou/upravenou hodnotu do výsledné matice dat
+            conflict.targetRowRef[conflict.globalColIdx] = textInput.value;
+            
+            AppState.log(`Konflikt pro klíč "${conflict.key}" ve sloupci "${conflict.colName}" vyřešen.`, "process");
+            groupDiv.remove();
+            
+            // Pokud jsou všechny konflikty z UI pryč, dokončíme export
+            if (container.querySelectorAll("div").length === 0) {
+                secDup.classList.add("hidden");
+                finalizeMergeOutput(resultRows);
+            }
+        };
+        
+        groupDiv.appendChild(saveBtn);
+        container.appendChild(groupDiv);
+    });
+    
+    document.getElementById("btn-pause").classList.add("hidden");
+    document.getElementById("btn-resume").classList.add("hidden"); // Blokujeme automatické pokračování, dokud to neklikne ručně
+}
+
+// Pomocná funkce pro dokončení zobrazení a stažení CSV
+function finalizeMergeOutput(resultRows) {
+    AppState.log("Všechna data byla úspěšně sloučena do nové matice.", "success");
+    const finalCsvText = resultRows.map(row => row.join(";")).join("\n");
+    
+    const previewArea = document.getElementById("preview-area");
+    const previewRows = resultRows.slice(0, 15).map(row => row.join(";")).join("\n");
+    previewArea.innerText = previewRows + (resultRows.length > 15 ? "\n... (a další řádky)" : "");
+    
+    document.getElementById("sec-result").classList.remove("hidden");
+    
+    const btnDownload = document.getElementById("btn-download");
+    btnDownload.onclick = function() {
+        const blob = new Blob([finalCsvText], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "sloucena_tabulka.csv";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        AppState.log("Výsledný soubor 'sloucena_tabulka.csv' byl stažen.", "out");
+    };
+}
+
+
+  
+        
+    </script>
+</body>
+</html>
