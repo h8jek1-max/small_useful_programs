@@ -306,7 +306,7 @@ async function nactiPudniProfil(lat, lon) {
 
             const obsah = document.createElement("div");
             obsah.style.display = index === 0 ? "block" : "none";
-            obsah.style.padding = "6px"; obsah.style.border = "4px solid rgba(46, 125, 50, 0.5)";  obsah.style.background = "rgba(107, 142, 109, 0.06)"; obsah.style.borderRadius = "6px"; 
+            obsah.style.padding = "6px"; obsah.style.border = "4px solid rgba(46, 125, 50, 0.5)";  obsah.style.background = "rgba(107, 142, 109, 0.06)"; obsah.style.borderRadius = "6px";  obsah.style.overflow = "auto";
 
             btn.onclick = () => {
                 Array.from(tabMenu.children).forEach(b => { b.style.background = "#aaa"; b.style.boxShadow = "none"; });
@@ -343,6 +343,11 @@ async function nactiPudniProfil(lat, lon) {
                     <div><b>Odvodnění krajiny:</b> ${dDrain}</div>
                     <div><b>Limit kořenů:</b> ${rDepthText}</div>
                     <div><b>Vodní kapacita (AWC):</b> ${Math.round(komp.awc_total)} mm/m</div>
+                    ${komp.odv ? `
+                    <div><b>Zásoba vody v kořenové zóně (${komp.odv.root_cm} cm):</b> ${komp.odv.taw_mm} mm</div>
+                    <div><b>Hydrologická skupina:</b> ${komp.odv.hsg || "-"} (CN ${komp.odv.cn2 || "-"}, Ksat min. ${komp.odv.ksat_min ?? "-"} mm/h)</div>
+                    <div><b>Uhlík v půdě:</b> ${komp.odv.soc_0_30} t/ha (0-30 cm), ${komp.odv.soc_0_100} t/ha (0-100 cm)</div>
+                    <div><b>Omezení:</b> ${komp.odv.limity.length ? komp.odv.limity.join("; ") : "žádné zjevné"}</div>` : ""}
                 </div>
                 <div style="padding: 0px; margin-bottom: 15px; font-size: 14px;">
                     Půda na tomto místě dokáže simultárně vsáknout maximálně <b>${vyslednaRychlost.toFixed(1)} mm srážek za hodinu</b>. 
@@ -373,6 +378,11 @@ if (vrstvyKys.length > 0) {
                     <th title="POMĚR UHLÍKU A DUSÍKU (C/N RATIO): Rychlost rozkladu organické hmoty. Rozsah: 5-50. Optimální rychlý rozklad: 10-12. Hodnoty kolem 15-20 značí stabilní, dřevnatější biomasu (mulč), která skvěle buduje trvalý úrodný profil.">Poměr C/N</th>
                     <th title="KATIONTOVÁ VÝMĚNNÁ KAPACITA JÍLU (CEC CLAY): Chemická aktivita jílu a schopnost vázat humus (vazba na živcové podloží). Rozsah: 0-100 cmolc/kg. Nad 24 = špičkový aktivní jíl (smektit) pevně fixující humus. Pod 12 = degradovaný jíl (kaolinit).">Aktivita jílu</th>
                     <th title="ELEKTRICKÁ VODIVOST (SALINITA): Množství rozpuštěných solí v půdě. Rozsah: 0-20 dS/m. Bezpečná hodnota pro jemné kořeny sazenic v biopásech je pod 2.0 dS/m. Vyšší hodnoty pálí kořeny a blokují příjem vody.">Salinita</th>
+                    <th title="POLNÍ KAPACITA (33 kPa): objemové % vody, které půda udrží po odtečení přebytku. Odvozeno z písku, jílu a humusu (Saxton &amp; Rawls 2006).">Pol. kap.</th>
+                    <th title="BOD VADNUTÍ (1500 kPa): objemové % vody, pod nímž ji rostliny už nezískají. Odvozeno z písku, jílu a humusu (Saxton &amp; Rawls 2006).">Bod vadn.</th>
+                    <th title="VODA DOSTUPNÁ ROSTLINÁM v dané vrstvě v mm (polní kapacita minus bod vadnutí, po odečtení skeletu). Součet přes kořenovou zónu je maximální zásoba pro vodní bilanci.">Dost. voda</th>
+                    <th title="NASYCENÁ HYDRAULICKÁ VODIVOST (Ksat) v mm/h: jak rychle půda propouští vodu. Pod 10 mm/h hrozí povrchový odtok.">Ksat</th>
+                    <th title="ZÁSOBA ORGANICKÉHO UHLÍKU ve vrstvě v t C/ha (uhlík x objemová hmotnost x mocnost, bez skeletu).">C t/ha</th>
                 </tr>
             </thead>
             <tbody>
@@ -429,6 +439,11 @@ if (vrstvyKys.length > 0) {
             <td>${cnVal}</td>
             <td style="${cecStyl}">${cecVal > 0 ? cecVal + " cmolc/kg" : "-"}</td>
             <td style="${ecVal !== "-" && parseFloat(ecVal) > 2.0 ? 'background:#ffebee; color:#b71c1c;' : ''}">${ecVal !== "-" ? ecVal + " dS/m" : "-"}</td>
+            <td>${l.fc != null ? l.fc + " %" : "-"}</td>
+            <td>${l.wp != null ? l.wp + " %" : "-"}</td>
+            <td style="font-weight:bold; color:#01579b;">${l.awc_mm != null ? l.awc_mm + " mm" : "-"}</td>
+            <td style="${l.ksat != null && l.ksat < 10 ? 'background:#ffebee; color:#b71c1c;' : ''}">${l.ksat != null ? l.ksat + " mm/h" : "-"}</td>
+            <td>${l.soc_tha != null ? l.soc_tha : "-"}</td>
         </tr>`;
     });
     
@@ -444,6 +459,7 @@ if (vrstvyKys.length > 0) {
 
         kontainer.appendChild(tabMenu);
         kontainer.appendChild(tabObsahKontainer);
+        pridejUpresneni(kontainer, dataPudy.komponenty, tabMenu);
     } catch (err) {
         metaPanel.innerHTML = `<i>Půdní profil: ${err.message}</i>`;
     }
@@ -570,6 +586,39 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });					
 							
+
+// UPŘESNĚNÍ ZASTOUPENÍ SLOŽEK PODLE POLNÍCH TESTŮ (Bayes: posterior ~ podíl x věrohodnost testů)
+function pridejUpresneni(kontainer, komps, tabMenu) {
+    const box = document.createElement("div");
+    box.style.cssText = "margin:10px 6px; padding:8px; border:1px solid #ccc; border-radius:6px; font-size:13px;";
+    box.innerHTML = `<b>Upřesnit odhad podle testů na vašem poli</b> (přepíše procenta na záložkách)
+      <div class="controls" style="margin-top:6px;">
+        <div><label>Test textury</label><select id="t_tex"><option value="">nevím</option><option value="p">drolí se (písčitá)</option><option value="h">váleček praská (hlinitá)</option><option value="j">hladký kroužek (jílovitá)</option></select></div>
+        <div><label>Test octem</label><select id="t_ph"><option value="">nevím</option><option value="s">šumí (vápenitá)</option><option value="n">nešumí</option></select></div>
+        <div><label>Vsak 25 mm</label><select id="t_inf"><option value="">nevím</option><option value="r">pod 10 min</option><option value="m">10-60 min</option><option value="s">nad 60 min</option></select></div>
+      </div>`;
+    kontainer.appendChild(box);
+    const ok = (shoda) => shoda ? 0.85 : 0.15;   // test je nejistý, proto ne 1 a 0
+    function prepocti() {
+        const tex = box.querySelector("#t_tex").value, ph = box.querySelector("#t_ph").value, inf = box.querySelector("#t_inf").value;
+        const post = komps.map(k => {
+            let w = parseFloat(k.share) || 0;
+            const d = (k.layers && k.layers["D1"]) || {};
+            const sand = parseFloat(d.sand), clay = parseFloat(d.clay), ks = parseFloat(d.ksat);
+            const vapno = parseFloat(d.caco3) > 0.5 || parseFloat(d.ph) > 7.2;
+            if (tex && !isNaN(sand) && !isNaN(clay)) { const t = sand > 60 ? "p" : clay > 30 ? "j" : "h"; w *= ok(t === tex); }
+            if (ph) w *= ok(vapno === (ph === "s"));
+            if (inf && !isNaN(ks)) { const c = ks >= 100 ? "r" : ks < 25 ? "s" : "m"; w *= ok(c === inf); }
+            return w;
+        });
+        const sum = post.reduce((a, b) => a + b, 0) || 1;
+        Array.from(tabMenu.children).forEach((b, i) => {
+            const prior = Math.round(parseFloat(komps[i].share) || 0), po = Math.round(100 * post[i] / sum);
+            b.innerText = (tex || ph || inf) ? `${prior} % → ${po} %` : `${prior} %`;
+        });
+    }
+    box.querySelectorAll("select").forEach(s => s.onchange = prepocti);
+}
 
 function upravPrůhlednostVrstvy() {
     if (puzniTileLayerLeaflet) {
