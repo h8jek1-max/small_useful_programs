@@ -23,7 +23,7 @@
     <div class="controls">
 		
 		<div>
-    <label>Vybrat lokalitu v ČR</label>
+    <label>Vybrat lokalitu</label>
     <select id="lokalita"  onchange="aplikujPrednastavenouLokalitu()">
             <option value="CUSTOM">-- Vlastní souřadnice (zadejte vedle) --</option>
 
@@ -438,20 +438,20 @@ async function stahniDlazdiceDoCache(tileIds) {
 }
 
 
-// --- KOMPLETNÍ FUNKCE PRO EXTRACT PIXELU Z LOKÁLNÍ LAND MASKY ---
+// --- OPRAVENÁ BEZPEČNÁ FUNKCE PRO PROSTOROVÉ MAPOVÁNÍ VEDLE MOŘE ---
 async function stahniAAkceptujPixel(lat, lon) {
     const X = Math.round((lon - (-179.875)) / 0.25);
     const Y = Math.round(((89.875) - lat) / 0.25);
     
-    // Rychlá kontrola mezí celého světa
+    // Rychlá kontrola mezí celého světa (bezpečnostní pojistka)
     if (X < 0 || X >= WIDTH || Y < 0 || Y >= HEIGHT) {
         return Array(CELKEM_MESICU).fill(null);
     }
 
     // 1. KROK: Kontrola moře/oceánu bleskově v paměti RAM
     const indexMasky = Y * WIDTH + X;
-    if (landMask[indexMasky] === 0) {
-        return Array(CELKEM_MESICU).fill(null); // Je to moře -> vracíme null řadu bez jakékoliv práce
+    if (!landMask || landMask[indexMasky] === 0) {
+        return Array(CELKEM_MESICU).fill(null); // Je to moře -> vracíme prázdné pole, PHP netrápíme
     }
 
     // Určení ID dlaždice a lokálních souřadnic uvnitř mřížky 45x45
@@ -462,14 +462,17 @@ async function stahniAAkceptujPixel(lat, lon) {
     const local_x = X % TILE_SIZE;
     const local_y = Y % TILE_SIZE;
 
-    // Pokud dlaždice není v cache (bezpečnostní pojistka), dotáhne se samostatně
+    // Pokud dlaždice není v cache, dotáhne se samostatně
     if (!(tileId in cacheRozbalenychDlazdic)) {
         await stahniDlazdiceDoCache([tileId]);
     }
 
     const rozbalenaDataDlazdice = cacheRozbalenychDlazdic[tileId];
+    
+    // !!! OPRAVA !!! Pokud dlaždice v cache neexistuje nebo je null (čisté moře na rozhraní),
+    // nesmíme pokračovat dál do smyčky, jinak kód havaruje na "TypeError: cannot read property".
     if (!rozbalenaDataDlazdice) {
-        return Array(CELKEM_MESICU).fill(null); // Dlaždice bez dat / čisté moře
+        return Array(CELKEM_MESICU).fill(null);
     }
 
     // 2. KROK: Výpočet pořadového čísla pevninského pixelu v této konkrétní dlaždici
@@ -488,12 +491,17 @@ async function stahniAAkceptujPixel(lat, lon) {
                 const pixelHistory = [];
                 const datovyIndexStart = indexPevninyVDlazdici * CELKEM_MESICU;
                 
+                // Pojistka proti přetečení pole, pokud by neseděla velikost dat
+                if (datovyIndexStart + CELKEM_MESICU > rozbalenaDataDlazdice.length) {
+                    return Array(CELKEM_MESICU).fill(null);
+                }
+
                 // Extrahujeme celou časovou řadu všech měsíců jdoucích za sebou
                 for (let m = 0; m < CELKEM_MESICU; m++) {
                     const kod = rozbalenaDataDlazdice[datovyIndexStart + m];
                     
                     // Zpětná transformace z 4-bitů (0 až 14) na reálné SPEI3 (-4.0 až 4.0)
-                    const spei = (kod === 15) ? null : (kod * (8.0 / 14.0)) - 4.0;
+                    const spei = (kod === 15 || kod === undefined) ? null : (kod * (8.0 / 14.0)) - 4.0;
                     pixelHistory.push(spei);
                 }
                 return pixelHistory;
@@ -509,6 +517,7 @@ async function stahniAAkceptujPixel(lat, lon) {
 
     return Array(CELKEM_MESICU).fill(null);
 }
+
 
 
 
