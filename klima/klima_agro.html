@@ -1,0 +1,2417 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Agroklimatické ukazatele</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="leaflet.min.css">
+    <script src="leaflet.min.js"></script>
+
+<style>
+    body { margin: 0; padding: 0; font-family: sans-serif; display: flex; height: 100vh; box-sizing: border-box;
+      justify-content: center;
+      align-items: center; }
+    #mapa-kontainer {  flex-grow: 1; height: 100%; margin: 0px; }
+    .vegetacni-panel {
+        position: relative; /* Nutné pro správné umístění táhla */
+        height: 100%; 
+        display: none; 
+        flex-direction: column; 
+        gap: 0px; 
+        width: 45%;       /* Výchozí šířka panelu při načtení */
+        min-width: 20%;   /* Minimální šířka */
+        max-width: 90%;   /* maximální šířka */
+        margin: 0px; 
+        background: #fff; 
+        padding: 0px 5px 0px 10px;
+        overflow-y: auto;  
+        opacity: 1;
+        transition: width 0.2s;
+    }
+    .resizer {
+        width: 8px;
+        height: 100%;
+        position: relative;
+        background: #ddd;
+        top: 0px;
+        left: 0px;
+        cursor: col-resize; /* Změní kurzor na šipky vlevo/vpravo */
+        user-select: none;  /* Zabrání označování textu při tažení */
+    }
+    .resizer:hover { background: #d6d6d6; }
+    .resizer2 {
+        width: 17px;
+        height: 30px;
+        position: absolute;
+        background: #ddd;
+        left: 0px;
+        top: 50%;
+        transform: translate(0%, -50%);
+        z-index: 1000;
+        border-radius: 0px 4px 4px 0px;
+    }
+    .resizer3 {
+        width: 100%;
+        height: 30px;
+        position: absolute;
+        background: #cecdcd;
+        right: 0px;
+        cursor: pointer;
+        user-select: none;
+        border-radius: 2px 6px 6px 2px;
+        opacity: 0.25;
+        border: 0px solid rgba(255, 255, 255, 0);
+        box-shadow: -1px -1px 3px #fafafa7a , 1px 1px 3px #0606067a , inset 7px 7px 12px #fafafa17 , inset -3px -7px 9px #06060621 , inset 7px 13px 13px #fafafa14 , inset -1px -1px 1px #06060652, inset 1px 1px 1px #fafafa4a;
+        transition: box-shadow 0.1s, background 0.1s;
+    }
+    .resizer3:hover { 
+        background: #42414140;
+        box-shadow: -2px -2px 9px #06060600 , 2px 2px 9px #fff0 , inset 7px 7px 12px #0000001a, inset -3px -7px 9px #ffffff12 , inset -7px -13px 13px #ffffff08 , inset -1px -1px 1px #ffffffc7, inset 1px 1px 1px #0606065c;
+        transition: box-shadow 0.1s, background 0.1s;
+    }
+    table.pudni-tabulka { width: 100%; border-collapse: collapse; margin-top: 0px; font-size: 12px; }
+    table.pudni-tabulka th, table.pudni-tabulka td { border: 1px solid #ddd; padding: 3px; text-align: center; }
+    table.pudni-tabulka th { background: #e4f0d6; color: #335e23; }
+    .dominantni-info { color: #3d3d3d; margin-bottom: 15px; font-size: 14px; }
+    .controls { margin-bottom: 0px; padding: 5px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-bottom: 0px; }
+    label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #444; }
+    input, select, button { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    button { background: #2e7d32; color: white; border: none; cursor: pointer; font-weight: bold; padding: 8px; margin-top: 15px; }
+    button:hover { background: #1b5e20; }
+</style>
+
+    <style>
+        :root {
+            --slider-height: 8px;
+            --handle-size: 22px;
+            --color-bg: #e2e8f0;
+            --color-track: #3b82f6;
+            --color-handle: #1e40af;
+            --color-tick: #cbd5e1;
+            --color-tick: #b7c3cf;
+            
+            --color-text-muted: #94a3b8;
+            --color-text-muted: #687b97;
+            --color-text-active: #0f172a;
+            --color-tick-active: #3b82f6;
+        }
+        
+        /* Sekce pro každý jednotlivý slider */
+        .slider-section {
+  width: 100%;
+  max-width: 500px;
+  grid-column: span 3;
+  margin: auto;
+        }
+
+        .slider-section h2 {
+            margin-top: 0;
+            color: #444;
+            font-size: 11px;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 0px;
+            margin-bottom: 0px; /* Dostatek místa pro vícepatrové kaskády popisků */
+        }
+
+.slider-container {
+	position: relative;
+	width: 75%;
+	margin: 0px 15px 15px 15px;
+}
+
+.sliderc {
+	display: flex;
+	width: 100%;
+	min-width: 250px;
+	max-width: 500px;
+	gap: 0px;
+	margin-top: 0px;
+	align-items: center;
+	align-content: center;
+	flex-wrap: wrap;
+}
+
+        .slider-scale-wrapper {
+            position: relative;
+            width: 100%;
+            height: 3px;
+            margin-bottom: 12px;
+        }
+
+        .sliderwrapper {
+            position: relative;
+            width: 100%;
+            height: 40px;
+            margin-bottom: 12px;
+        }
+
+        .scale-point {
+            position: absolute;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+        }
+
+        .scale-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--color-text-muted);
+            white-space: nowrap;
+            position: absolute;
+            bottom: 16px; 
+            transform-origin: bottom center;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Statické popisky plynule mizí */
+        .scale-point:not(.is-active) .scale-label {
+            transition: opacity 0.2s ease;
+        }
+
+        /* Aktivní popisky jezdců – bez blikání opacity, animuje se pouze výška */
+        .scale-point.is-active .scale-label {
+            color: var(--color-text-active);
+            font-weight: 800;
+            background: white;
+            /*transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), color 0.2s ease;*/
+        }
+
+        .scale-tick {
+            width: 2px;
+            height: 10px;
+            background-color: var(--color-tick);
+            position: absolute;
+            bottom: 0;
+            transition: background-color 0.2s ease, height 0.2s ease;
+        }
+        
+        .mes {
+            width: 3px;
+            height: 18px;
+            background-color: var(--color-tick);
+            position: absolute;
+            bottom: -8px;
+            transition: background-color 0.2s ease, height 0.2s ease;
+        }
+        
+        .scale-point.is-active .scale-tick {
+            background-color: var(--color-tick-active);
+            height: 14px;
+            bottom: 0;
+        }
+
+        /* Hlavní osa */
+        .slider-base-track {
+            position: relative;
+            width: 100%;
+            height: var(--slider-height);
+            background-color: var(--color-bg);
+            border-radius: 4px;
+            box-shadow: inset 0px 1px 4px #00000038;
+        }
+
+        .slider-highlight-track {
+            position: absolute;
+            height: 100%;
+            background-color: var(--color-track);
+            background: #3B82F6;
+background: linear-gradient(0deg, rgba(59, 130, 246, 1) 0%, rgb(95, 157, 254) 50%, rgba(59, 130, 246, 1) 100%);
+            border-radius: 4px;
+            pointer-events: none;
+            cursor: grab;
+            pointer-events: auto; /* Změna: track nyní zachytává kliknutí myší */
+        }
+        
+        .slider-highlight-track:active {
+            cursor: grabbing;
+        }
+        
+        .slider-highlight-track:hover {
+background: linear-gradient(0deg, rgba(59, 130, 246, 1) 0%, rgb(95, 157, 254) 20%,  rgb(95, 157, 254) 80%, rgba(59, 130, 246, 1) 100%);
+        }
+
+        .slider-handle {
+            position: absolute;
+            top: 50%;
+            width: var(--handle-size);
+            height: var(--handle-size);
+            background-color: var(--color-handle);
+background: radial-gradient(circle, rgb(60, 91, 190) 0%, rgba(30, 64, 175, 1) 50%);
+            border-radius: 50%;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+            user-select: none;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        .slider-handle:active {
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+
+        .slider-handle:hover {
+background: radial-gradient(circle, rgb(89, 113, 192) 10%, rgba(30, 64, 175, 1) 90%);
+        }
+
+.btn {
+	border: none;
+	padding: 2px 6px 4px 6px;
+	font-size: 25px;
+	font-weight: bold;
+	border-radius: 6px;
+	cursor: pointer;
+	margin: 5px;
+	line-height: 20px;
+	transition: background-color 0.2s;
+	width: auto;
+	height: auto;
+	position: relative;
+	right: auto;
+	user-select: none;
+	opacity: 0.73;
+}
+
+        .btn-plus { background-color: #10b981; color: white; }
+        .btn-plus:hover { background-color: #059669; } 
+.btn-minus {
+	background-color: #ef4444;
+	color: white;
+	display: none;
+	padding: 2px 7.3px 6px 7.3px;
+	font-size: 35px;
+	line-height: 18px;
+}
+        .btn-minus:hover { background-color: #dc2626; }
+
+        /* Náhled odesílaných dat pro kontrolu */
+        .preview-box {
+            margin-top: 25px;
+            background: #f1f5f9;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #475569;
+        }
+    </style>
+    
+    
+  <style>
+
+    /* Obal pro celý widget záložek */
+    .tabs-wrapper {
+      width: 100%;
+      max-width: 600px; /* Maximální šířka na desktopu */
+      grid-column: span 3;
+    }
+
+    /* Panel tlačítek - HLAVNÍ ZMĚNA: vycentrování */
+    .tab-buttons {
+	display: flex;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 10px;
+	padding: 0px 0px 0px 0px;
+	border-bottom: 3px solid #9da2a8;
+	border-radius: 10px 10px 0 0;
+}
+
+    /* Základní styl tlačítek (nezvýrazněné) */
+    .tab-btn {
+	padding: 7px 3px;
+	border: none;
+	background-color: #e9e9ed;
+	color: #444;
+	cursor: pointer;
+	border-radius: 6px 6px 0 0;
+	font-weight: 600;
+	font-size: 12px;
+	max-width: 70px;
+	margin-top: 0px;
+	border: 1px solid #b4bac0;
+	border-bottom: 0px solid white;
+}
+
+    /* 1. Efekt při najetí myší (trochu zvýrazněný) */
+.tab-btn:hover {
+	background-color: #dedede;
+}
+
+    /* 2. Styl pro aktivní/kliknuté tlačítko (nejvíc zvýrazněné) */
+.tab-btn.active {
+	background-color: #ffffff;
+	color: #0f172a;
+	border: 1px solid #9da2a8;
+	border-bottom: 3px solid #fff;
+	margin-bottom: -3px;
+}
+
+    /* Obal pro veškerý obsah */
+.tab-container {
+	border-top: none;
+	padding: 0px;
+	background-color: #ffffff;
+	min-height: 100px;
+	padding-bottom: 10px;
+	padding-top: 10px;
+	margin-bottom: 0px;
+}
+
+    /* Skrytí všech obsahů standardně */
+    .tab-content {
+      display: none;
+    }
+
+    /* Zobrazení pouze aktivního obsahu */
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Nadpisy a texty uvnitř obsahu */
+.tab-content h3 {
+	margin-bottom: 0px;
+	color: #444;
+	font-size: 14px;
+	margin-top: 10px;
+}
+
+.tab-content p {
+	line-height: 1.2;
+	color: #444;
+	color: #3d3d3d;
+	/* margin-bottom: 15px; */
+	font-size: 14px;
+	margin-top: 7px;
+}
+
+    /* RESPONZIVITA: Úprava pro mobily a malé obrazovky */
+    @media (max-width: 480px) {
+      .tab-buttons {
+        flex-direction: column; /* Tlačítka půjdou pod sebe */
+        padding: 0px;
+        border-bottom: none;
+      }
+      .tab-btn {
+        border-radius: 6px;
+        width: 100%; /* Tlačítka budou přes celou šířku */
+        text-align: center;
+      }
+      .tab-btn.active {
+        margin-bottom: 0;
+        border-bottom: 2px solid #cbd5e1; /* Na mobilu vrátíme spodní hranu */
+        background-color: #1e293b; /* Kontrastnější barva pro aktivní na mobilu */
+        color: #ffffff;
+      }
+      .tab-container {
+        border-top: 2px solid #cbd5e1;
+        border-radius: 8px;
+        margin-top: 10px;
+      }
+    }
+  </style>
+  
+     <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            background-color: #ffffff;
+            box-shadow: 0 0px 0px rgba(0,0,0,0.1);
+            border: 2px solid #b4bac0;
+        }
+        th, td {
+            padding: 12px 15px;
+  padding: 6px 5px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+            border-right: 1px solid #b4bac0;
+            color: hsl(0, 0%, 12%);
+  font-size: 15px;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            color: #444;
+            background-color: #e9e9ed;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 7px 3px;
+            padding-right: 30px; /* Prostor pro šipku */
+  box-sizing: border-box;
+            text-align: center;
+            border: 1px solid #b4bac0;
+        }
+        th:hover {
+            background-color: #45a049;
+            background-color: #dedede;
+        }
+        /* Stylování indikátoru řazení */
+        th::after {
+            content: '';
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.8em;
+            opacity: 0.6;
+        }
+        th.asc::after {
+            content: '▲';
+            opacity: 1;
+        }
+        th.desc::after {
+            content: '▼';
+            opacity: 1;
+        }
+        th.ozn {
+background-color: #ffffff;
+  color: #0f172a;
+  border: 1px solid #9da2a8;
+        }
+        /* Každý druhý řádek má zvýrazněné pozadí */
+        tbody tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+       /*  tbody tr:hover {
+            background-color: #e2f0d9;
+        }
+        Jemné odlišení prázdných buněk pro přehlednost 
+        td:empty::after {
+            content: '—';
+            color: #ccc;
+        }*/
+    </style>
+
+<style>
+        
+        /* Styly pro vyhledávací panel */
+        .search-container { position: relative; display: flex; gap: 6px; margin-bottom: -1px; padding-left: 5px; align-items: center; }
+        .input-wrapper { position: relative; flex-grow: 1; max-width: 200px; }
+        .search-input { min-width: 200px; width: 100%; padding: 6px 17px 6px 7px; box-sizing: border-box; border: 2px solid #b4bac0;
+  width: auto;
+  border-radius: 6px 6px 0px 0px;}
+        .clear-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); border: none; background: transparent; cursor: pointer; font-weight: bold; color: #999; display: none;  width: auto; }
+        .clear-btn:hover { color: #333; }
+        .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; z-index: 1000; max-height: 300px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: 0; padding: 0; list-style: none; }
+        .autocomplete-list li { padding: 5px 7px; cursor: pointer; }
+        .autocomplete-list li:hover { background-color: #f0f0f0; }
+        
+            input, select, button { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+        
+        select { width: auto; border: 2px solid #b4bac0;
+  width: auto;
+  border-radius: 6px 6px 0px 0px;}
+        tr.hidden { display: none; }
+    
+#tabulka thead th { position: sticky; top: 0; z-index: 2; }
+#tabulka .search-container { margin: 4px 0 0 0; padding-left: 0; }
+.vt-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; border-bottom: 3px solid #9da2a8; }
+.vt-tab { width: auto; margin: 0; padding: 6px 12px; background: #e9e9ed; color: #444; border: 1px solid #b4bac0; border-bottom: none; border-radius: 6px 6px 0 0; font-size: 13px; font-weight: 600; }
+.vt-tab:hover { background: #dedede; }
+.vt-tab.act { background: #fff; color: #0f172a; border-color: #9da2a8; margin-bottom: -3px; border-bottom: 3px solid #fff; }
+</style>
+</head>
+
+<style>
+.napoveda-okno { position: fixed; display: none; flex-direction: column; background: #fff; border: 1px solid #9aa5a0; border-radius: 8px;/* box-shadow: 0 4px 24px rgba(0,0,0,.35);*/ box-shadow: rgba(0, 0, 0, 0.2) 0px 0px 300px,rgba(0, 0, 0, 0.1) 0px 0px 30px; z-index: 2000; box-sizing: border-box; }
+.napoveda-okno.cela { border-radius: 0; }
+.napoveda-obsah { overflow-y: auto; flex: 1; font-size: 14px; color: #222; line-height: 1.35; }
+.napoveda-sipka { position: absolute; width: 14px; height: 14px; background: #fff; border: 1px solid #9aa5a0; transform: rotate(45deg); display: none; }
+.napoveda-sipka.dole { border-right: none; border-bottom: none; }
+.napoveda-sipka.nahore { border-left: none; border-top: none; }
+.napoveda-sipka.vpravo { border-top: none; border-right: none; }
+.napoveda-sipka.vlevo { border-left: none; border-bottom: none; }
+.napoveda-zavrit {
+	position: absolute;
+	right: 4px;
+	top: 3px;
+	width: 26px;
+	height: 26px;
+	margin: 0;
+	padding: 0;
+	border-radius: 4px;
+	font-size: 28px;
+	line-height: 0;
+	z-index: 2;
+	font-weight: bold;
+	cursor: pointer;
+	color: #b19090;
+	opacity: 0.9;
+	background: hsl(0, 100%, 90%);
+	padding-bottom: 3px;
+}
+#napoveda-zavesa { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 1999; }
+.pol { display: inline-flex; align-items: center; gap: 5px; margin: 3px 4px 3px 0; cursor: pointer; max-width: 150px;}
+.pol input { width: auto; transform: scale(1.25); margin-right: 3px; }
+.pol-pot { /*padding: 4px 6px; background: #f1f8e9; border: 1px solid #c5e1a5; border-radius: 5px; display: flex; flex-wrap: wrap; */}
+.skupina { font-weight: bold; margin-top: 8px; border-bottom: 1px solid #ddd; color: #33691e; }
+.pozn { font-size: 12px; color: #666; font-weight: normal; }
+.skuro {
+	width: 176px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 5px;
+}
+.klic {
+	display: inline-block;
+  width: 26px;
+  height: 26px;
+  padding: 0px 0px 3px;
+  border-radius: 4px;
+  font-size: 17px;
+  cursor: pointer;
+  opacity: 0.9;
+  background: rgb(253, 255, 204);
+  position: relative;
+  margin-bottom: 5px;
+  top: -3px;
+  margin: 0 0 0 5px;
+}
+.tl-mal { width: auto; margin-top: 4px; padding: 4px 9px; font-size: 13px;
+	height: auto;
+  min-height: 30px;
+  margin: 0;
+  cursor: pointer;
+  color: #454545;
+  opacity: 0.9;
+  padding: 5px 10px;
+  border-radius: 5px;
+  width: auto;
+  background: hsl(100, 100%, 90%);
+  position: relative;
+	padding-bottom: 10px;
+  padding-top: 10px;
+	 }
+#tabulka table.vypis { border-collapse: collapse; font-size: 13px; }
+#tabulka table.vypis th, #tabulka table.vypis td { border: 1px solid #c8c8c8; padding: 3px 7px; text-align: right; }
+#tabulka table.vypis th { background: #eef3ea; font-weight: 600; }
+#tabulka .popis { font-size: 13px; color: #555; margin-bottom: 6px; }
+#tabulka .j { font-weight: normal; color: #666; font-size: 11px; }
+#mapa-zprava { color: #b71c1c; font-size: 13px; margin: 4px 0; }
+.sk-wrap { display: flex; flex-wrap: wrap; gap: 30px; align-items: flex-start; justify-content: center; }
+.sk-box { /*border: 1px solid #c5e1a5;*/ border-radius: 6px; padding: 4px 8px; background: #fafdf6; }
+.sk-box .skupina { border-bottom: none; margin-top: 0; }
+.zn-ikona { background: none; border: none; }
+.zn-kolo { position: absolute; left: -4px; top: -4px; width: 6px; height: 6px; border: 1px solid #e65100; border-radius: 50%; background: rgba(230,81,0,.4); }
+.zn-text { position: absolute; left: 0; top: 7px; transform: translateX(-50%); background: rgba(255,255,255,.92); border: 1px solid #e65100; border-radius: 3px; font: 11px/1.25 sans-serif; padding: 1px 4px; white-space: nowrap; color: #222; }
+
+
+h4 { margin: 0px 0px 0px 0px;text-align: center; }
+p { margin: 5px 0px 10px 0px; }
+</style>
+
+<body>
+
+<div id="mapa-kontainer"></div>
+<div id="napoveda-zavesa"></div>
+
+<div class="resizer"><div class="resizer2"><div class="resizer3"></div></div></div>
+
+<div class="vegetacni-panel">
+    <h4 style="margin: 10px 10px 5px 10px;text-align: center;">Agroklimatické ukazatele</h4>
+    <span style="margin:0px 10px 10px 10px;text-align: center; font-size:14px;">Celý program i s databází si můžete stáhnout na <a href="https://github.com/h8jek1-max/small_useful_programs">Githubu</a></span>
+
+<div class="controls">
+<!--
+title="Vyberte zemědělský klimatický parametr"
+-->
+    <div style="grid-column: span 1;">
+        <label>Vyberte klimatický parametr</label>
+        <button class="resizer3" id="btn-parametry" type="button"  style="margin-top:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+        max-width: 185px;
+        height:auto;min-height:30px;margin:0;cursor:pointer;color:#454545;opacity:0.9;padding:5px 10px;border-radius:5px;
+         width: 100%;
+  background: hsl(100, 100%, 90%);
+  position: relative;
+        
+        ">Parametry</button>
+        <div id="vybrane-prehled" style="display:none;"></div>
+    </div>
+    <div id="gps-blok" style="grid-column: span 2; display: none;">
+            <label>Zeměpisné souřadnice (GPS)</label>
+        <input type="text" id="gps_vstup" value="" onchange="zadanoGps()" placeholder="Zeměpisné souřadnice, např. 50.62, 15.09"  style="margin-top:0;">
+    </div>
+<!--
+title="Zeměpisné souřadnice (GPS), formát: 50.62, 15.09"
+-->
+    <div style="grid-column: span 3; display: block; color: hsl(0, 0%, 12%); font-size: 15px; line-height: 1.3;" id="vysv">
+        <p>
+        Databáze vychází z agroklimatických indikátorů <a href="https://cds.climate.copernicus.eu/datasets/sis-agroclimatic-indicators?tab=overview ">Copernicus</a> (C3S) experiment RCP6.0 (Podle metodiky Mezivládního panelu pro změnu klimatu (IPCC) jde o starší středně vysoký scénář, ve kterém emise skleníkových plynů vrcholí kolem roku 2080 a následně klesají. Celkové radiační působení se tak po roce 2100 ustálí na hranici 6,0 W/m².) v mřížce 720 × 360 bodů s krokem 0,5°,
+        v časovém kroku po deseti dnech pro roky 2011 až 2099. Obsahuje 67 420 buněk pevniny.
+        </p>
+        <h4>Co databáze obsahuje</h4>
+        <p>
+        <b>Mráz a zima:</b> nejnižší teplota (TNn, určuje zimovzdornost a vymrzání), mrazové dny, poslední jarní a první podzimní mráz a z nich odvozené bezmrazové období.<br>
+        <b>Teplo a vegetace:</b> průměrná, minimální a maximální teplota, nejvyšší teplota (TXx), letní dny nad 20, 25, 30 a 35 °C, tropické noci a odvozená vegetační sezóna (dekády s průměrem nad 5 °C).<br>
+        <b>Srážky:</b> deštivé dny, dny se silným deštěm, intenzita srážek v deštivých dnech (SDII) a z nich odhadnutý úhrn (deštivé dny × intenzita).
+        </p>
+        <h4>Přesnost</h4>
+        <p>
+        Roční součty počtů dní, roční průměrná teplota, roční nejvyšší teplota a termíny mrazů jsou v databázi přesné. Nejnižší teplota po dekádách je přesná na 0,5 °C do +10 °C.
+        Ostatní hodnoty po dekádách jsou přibližné (typická odchylka teplot asi ±1,5 °C, počtů dní asi ±1 den) a v grafech i výpisech jsou označeny ≈.
+        Skutečně extrémní intenzity srážek (od 50 mm/den) jsou uloženy přesně.
+        </p>
+        <h4>Klimatický zemědělský potenciál</h4>
+        <p>
+        Odhad podílu výživové hodnoty (kcal) druhů plodin z mnou sestavené tabulky s pomocí AI, které v dané lokalitě prosperují. Posuzuje se zimovzdornost (USDA zóna a letální teplota), délka bezmrazového období
+        u jednoletých druhů, teploty (nejnižší, průměrná) a srážky podle Ecocropu (FAO) a sumy teplot. Nezahrnuje evapotranspiraci (výpar), půdu, vodní bilanci a závlahu, sklon a expozici terénu, vítr, škůdce a nemoci ani odrůdy. Tyto údaje mohou výsledek zásadně změnit.
+        </p>
+        <p>
+        <b>Návod:</b> Tlačítkem <b>Parametry</b> vyberte, co chcete sledovat. U vybraného parametru se objeví klíč pro nastavení rozsahů. Poté klikněte do mapy nebo zapište souřadnice
+        (GPS), zvolte dekády v roce a v záložce <b>Graf</b> vývoj sledujte; v záložce <b>Mapa</b> můžete vybrat až dva parametry pro zobrazení v mapě.
+        </p>
+    </div>
+
+    <div id="dekady-blok" style="grid-column: span 3; display: none;margin-top: 5px;">
+
+        <div class="slider-section">
+            <label>Dekády v roce</label>
+<!--
+            title="Dekády v roce"
+-->
+            <div id="slider-dekady-kontejner" style="margin-top: 0px;"></div>
+            <div id="sezony-legenda" style="display:none;"></div>
+            <div style="display:none;gap:6px;flex-wrap:wrap;">
+                <button type="button" class="tl-mal" onclick="predvolbaDekad('rok')">Celý rok</button>
+                <button type="button" class="tl-mal" onclick="predvolbaDekad('veg')" title="Dekády, ve kterých podle množství slunce rostliny rostou (světle i sytě zelená)">Vegetační sezóna</button>
+                <button type="button" class="tl-mal" onclick="predvolbaDekad('zima')">Zima</button>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="tabs-blok" style="grid-column: span 3; display: none;margin-top: 3px;">
+        <div class="tabs-wrapper">
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="switchTab(event, 'obsah1')">Mapa</button>
+                <button class="tab-btn" onclick="switchTab(event, 'obsah2')">Graf</button>
+            </div>
+            <div class="tab-container">
+                <div id="obsah1" class="tab-content active">
+					
+                    <button class="resizer3" id="btn-mapa-parametry" type="button" style="
+                     height:auto;min-height:30px;margin:0;margin-top:7px;cursor:pointer;color:#454545;opacity:0.9;padding:5px 10px;border-radius:5px;width:auto;background:hsl(100, 100%, 90%);position:relative;
+                    
+                    ">Vybrat parametry pro zobrazení</button>
+                    <div id="mapa-zprava"></div>
+                    <div style="grid-column: span 3; display:none;margin-top:13px;" id="gsl_casovy_panel">
+                        <label>Zvolený rok pro zobrazení v mapě: <span id="gsl_rok_label" style="font-weight:bold; color:#e65100;">2031</span></label>
+                        <center><input type="range" id="gsl_rok_slider" min="2011" max="2099" value="2031" step="1" oninput="posunulSeRokMapy()" style="width: 90%;margin: auto;margin-top:5px;"></center>
+                    </div>
+                    <div id="mapa-legenda" class="pudni-panel" style="display:none; grid-column: span 3; color: #444;">
+                        <label id="legenda-titulek" style="font-size: 12px;margin-bottom: 25px;
+  margin-top: 10px;">Legenda:</label>
+                        <div id="legenda-barvy" style="display:flex; flex-wrap: wrap; gap:20px; max-width: 410px; margin: 4px auto 0px auto; color: rgb(0, 0, 0); font-size: 13px; justify-content: center; align-items: flex-start;"></div>
+                    </div>
+                </div>
+<!--
+title="Roky v grafu"
+-->
+                <div id="obsah2" class="tab-content">
+                    <div class="slider-section" style="margin-top: 3px;">
+                        <label>Roky v grafu</label>
+                        <div id="slider-roky-kontejner" ></div>
+                    </div>
+                    <div style="margin-top: 5px;display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));">
+                        <canvas id="gslGraf" width="1600" height="640" style="cursor: pointer; border: 1px solid #ddd; background: #fff; width: 100%; height: auto; border-radius: 6px; display:none; opacity: 1; transition: opacity 0s;grid-column: span 3;" onclick="
+                            const g=document.getElementById('gslGraf');
+                            if (g.style.position === 'fixed') { g.style.transition='opacity 0.5s'; g.style.opacity='0'; setTimeout(function(){ g.style.transition='opacity 0s';g.style.position='';g.style.left='';g.style.top='';g.style.transform='translate(0%, 0%)';g.style.zIndex='';g.style.boxShadow='';g.style.opacity='1'; }, 500); }
+                            else { g.style.opacity='0'; g.style.position='fixed'; g.style.left='50%'; g.style.top='50%'; g.style.transform='translate(-50%, -50%)'; g.style.zIndex='1000'; g.style.boxShadow='0px 0px 300px rgba(0, 0, 0, 0.5)'; setTimeout(function(){ g.style.transition='opacity 0.5s'; g.style.opacity='1'; }, 100); }
+                        "></canvas>
+                        <div class="dominantni-info" id="gsl-meta-info" style="
+  margin-top: 10px;
+  margin-bottom: 14px;
+  grid-column: span 2;
+  padding-right: 10px;
+  ">Kliknutím do mapy zobrazíte graf vývoje na daných souřadnicích nebo je výše napište.</div>
+                        
+                        <button class="resizer3" id="tlacitko-vypis" type="button" style="display:none;margin-top:0;
+                        height:auto;min-height:30px;margin:0;cursor:pointer;color:#454545;opacity:0.9;padding:10px 10px;border-radius:5px;width:auto;background:hsl(100, 100%, 90%);position:relative;
+                        grid-column: span 1;
+  margin-top: 14px;
+  max-height: 70px;margin-bottom: 14px;
+                        " onclick="otevriVypis()">Zobrazit výpis a exportovat data</button>
+                        <div class="dominantni-info" id="tabulka" style="display:none; opacity: 0; position: fixed; top: 0px; left: 50%; transform: translate(-50%, 0%); width: 100%; min-width: 350px; max-width: 900px; height: 100vh; max-height: 100vh; box-sizing: border-box; overflow: hidden; border-radius: 7px; z-index: 1000; box-shadow: rgba(0, 0, 0, 0.5) 0px 0px 300px, inset 0px 0px 300px rgb(239, 255, 232), inset 0px 0px 200px rgb(239, 255, 232), inset 0px 0px 100px rgb(239, 255, 232); padding: 40px 0px 0px 0px; transition: opacity 0.5s;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const COLL_BASE = new Intl.Collator('cs', { sensitivity: 'base' });
+const COLL = new Intl.Collator('cs');
+
+class SmartTable {
+    constructor(searchContainerId, tableId) {
+        this.container = document.getElementById(searchContainerId);
+        this.table = document.getElementById(tableId);
+        if (!this.container || !this.table || !this.table.tHead || !this.table.tBodies[0]) return;
+
+        // Předchozí instance téže tabulky zrušíme (jinak by se listenery na vyhledávání hromadily)
+        const reg = (window.smartTableInstances = window.smartTableInstances || {});
+        if (reg[tableId]) reg[tableId].destroy();
+        reg[tableId] = this;
+
+        this.ac = new AbortController();
+        this.searchInput = this.container.querySelector(".search-input");
+        this.clearBtn = this.container.querySelector(".clear-btn");
+        this.searchField = this.container.querySelector(".search-field");
+        this.autocompleteList = this.container.querySelector(".autocomplete-list");
+
+        this.tBody = this.table.tBodies[0];
+        this.headers = Array.from(this.table.tHead.rows[0].cells);
+        this.rows = Array.from(this.tBody.rows);          // jediný zdroj řádků (řazení i hledání)
+        this.smeryRazeni = Array(this.headers.length).fill(true);
+        this.cached = false;
+        this.uniq = {};
+
+        this.init();
+    }
+
+    destroy() { this.ac.abort(); }
+
+    // Texty buněk se načtou z DOMu jen jednou
+    ensureCache() {
+        if (this.cached) return;
+        for (const row of this.rows) {
+            row._t = Array.from(row.cells, c => c.textContent.trim());
+            row._l = row._t.map(t => t.toLowerCase());
+        }
+        this.cached = true;
+    }
+
+    init() {
+        const sig = { signal: this.ac.signal };
+
+        if (this.searchField) {
+            while (this.searchField.options.length > 1) this.searchField.remove(1);
+            this.headers.forEach((th, index) => {
+                const option = document.createElement("option");
+                option.value = index;
+                option.textContent = th.textContent.trim();
+                this.searchField.appendChild(option);
+            });
+        }
+
+        this.headers.forEach((hlavicka, i) => {
+            hlavicka.addEventListener('click', () => this.seradTabulku(hlavicka, i), sig);
+        });
+
+        if (this.searchInput) {
+            const run = () => { this.filterTable(); this.updateAutocomplete(); };
+            this.searchInput.addEventListener("input", this.debounce(run, 250), sig);
+            if (this.searchField) this.searchField.addEventListener("change", run, sig);
+
+            if (this.clearBtn) {
+                this.clearSearch();
+                this.clearBtn.addEventListener("click", () => this.clearSearch(), sig);
+            }
+
+            // Jeden listener na celý našeptávač (delegace)
+            this.autocompleteList.addEventListener("click", (e) => {
+                const li = e.target.closest("li");
+                if (!li) return;
+                this.searchInput.value = li.textContent;
+                this.filterTable();
+                this.autocompleteList.innerHTML = "";
+            }, sig);
+
+            document.addEventListener("click", (e) => {
+                if (!this.searchInput.contains(e.target) && !this.autocompleteList.contains(e.target)) {
+                    this.autocompleteList.innerHTML = "";
+                }
+            }, sig);
+        }
+    }
+
+    // --- ŘAZENÍ ---
+    prevedNaDatum(text) {
+        if (!text) return NaN;
+        const match = text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (match) return Date.parse(`${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`);
+        return Date.parse(text);
+    }
+
+    urciTypSloupce(idx) {
+        let numeric = 0, date = 0, string = 0, total = 0;
+        for (const row of this.rows) {
+            const text = row._t[idx];
+            if (!text) continue;
+            total++;
+            if (!isNaN(text.replace(',', '.')) && !isNaN(parseFloat(text.replace(',', '.')))) numeric++;
+            else if (!isNaN(this.prevedNaDatum(text))) date++;
+            else string++;
+        }
+        const druhy = (numeric > 0) + (date > 0) + (string > 0);
+        if (druhy > 1) return 'mixed';
+        if (numeric === total) return 'numeric';
+        if (date === total) return 'date';
+        return 'string';
+    }
+
+    seradTabulku(hlavicka, idx) {
+        this.ensureCache();
+        const typ = this.urciTypSloupce(idx);
+        const asc = this.smeryRazeni[idx];
+
+        this.headers.forEach(h => h.classList.remove('asc', 'desc', 'ozn'));
+        hlavicka.classList.add(asc ? 'asc' : 'desc', 'ozn');
+
+        // Klíče se spočítají jednou na řádek, ne při každém porovnání
+        const items = this.rows.map(row => {
+            const v = row._t[idx] || '';
+            let k = v;
+            if (v !== '') k = typ === 'numeric' ? parseFloat(v.replace(',', '.')) : typ === 'date' ? this.prevedNaDatum(v) : v;
+            return { row, v, k };
+        });
+        const dir = asc ? 1 : -1;
+
+        items.sort((a, b) => {
+            if (a.v === '' && b.v === '') return 0;
+            if (a.v === '') return 1;
+            if (b.v === '') return -1;
+            if (a.v === b.v) return 0;
+            let c;
+            if (typ === 'numeric' || typ === 'date') c = a.k - b.k;
+            else if (typ === 'mixed') c = (a.v.length - b.v.length) || COLL.compare(a.v, b.v);
+            else c = COLL_BASE.compare(a.v, b.v);
+            return c * dir;
+        });
+
+        this.rows = items.map(i => i.row);
+        const frag = document.createDocumentFragment();
+        this.rows.forEach(r => frag.appendChild(r));
+        this.tBody.appendChild(frag);                       // jediný zápis do DOMu
+        this.smeryRazeni[idx] = !asc;
+    }
+
+    // --- VYHLEDÁVÁNÍ ---
+    debounce(func, delay) {
+        let timeout;
+        return (...args) => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), delay);
+        };
+    }
+
+    normalize(s) { return s.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+
+    // Levenshtein se dvěma řádky místo celé matice (méně paměti)
+    levenshtein(a, b) {
+        if (a === b) return 0;
+        if (!a.length) return b.length;
+        if (!b.length) return a.length;
+        let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+        let cur = new Array(b.length + 1);
+        for (let i = 1; i <= a.length; i++) {
+            cur[0] = i;
+            for (let j = 1; j <= b.length; j++) {
+                cur[j] = a[i - 1] === b[j - 1] ? prev[j - 1] : 1 + Math.min(prev[j - 1], cur[j - 1], prev[j]);
+            }
+            [prev, cur] = [cur, prev];
+        }
+        return prev[b.length];
+    }
+
+    getUnique(mode) {
+        if (this.uniq[mode]) return this.uniq[mode];
+        this.ensureCache();
+        const set = new Set();
+        const idx = mode === "all" ? -1 : parseInt(mode, 10);
+        for (const row of this.rows) {
+            if (idx < 0) row._t.forEach(t => { if (t) set.add(t); });
+            else if (row._t[idx]) set.add(row._t[idx]);
+        }
+        const vals = Array.from(set);
+        return (this.uniq[mode] = { vals, low: vals.map(v => v.toLowerCase()), norm: null });
+    }
+
+    filterTable() {
+        this.ensureCache();
+        const query = this.searchInput.value.toLowerCase().trim();
+        const mode = this.searchField ? this.searchField.value : "all";
+        const idx = mode === "all" ? -1 : parseInt(mode, 10);
+
+        if (this.clearBtn) this.clearBtn.style.display = query === "" ? "none" : "block";
+
+        for (const row of this.rows) {
+            let match = true;
+            if (query !== "") {
+                const l = row._l;
+                match = false;
+                if (idx < 0) {
+                    for (let i = 0; i < l.length; i++) if (l[i].includes(query)) { match = true; break; }
+                } else {
+                    match = l[idx] !== undefined && l[idx].includes(query);
+                }
+            }
+            const hide = !match;
+            if (row._hid !== hide) { row._hid = hide; row.classList.toggle("hidden", hide); }   // zápis jen při změně
+        }
+    }
+
+    updateAutocomplete() {
+        const list = this.autocompleteList;
+        if (!list) return;
+        list.innerHTML = "";
+
+        const query = this.searchInput.value.toLowerCase().trim();
+        if (query.length < 1) return;
+
+        const u = this.getUnique(this.searchField ? this.searchField.value : "all");
+        let result = [];
+
+        for (let i = 0; i < u.vals.length && result.length < 50; i++) {
+            if (u.low[i].includes(query)) result.push(u.vals[i]);
+        }
+
+        // Žádná přímá shoda -> podobnost (Levenshtein, bez diakritiky; max. 3000 hodnot kvůli rychlosti)
+        if (result.length === 0) {
+            if (!u.norm) u.norm = u.vals.slice(0, 3000).map(v => this.normalize(v.toLowerCase()));
+            const q = this.normalize(query);
+            result = u.norm
+                .map((n, i) => ({ i, d: this.levenshtein(q, n) }))
+                .sort((a, b) => a.d - b.d)
+                .slice(0, 50)
+                .map(o => u.vals[o.i]);
+        }
+
+        const frag = document.createDocumentFragment();
+        result.forEach(value => {
+            const li = document.createElement("li");
+            li.textContent = value;
+            frag.appendChild(li);
+        });
+        list.appendChild(frag);
+    }
+
+    clearSearch() {
+        this.searchInput.value = "";
+        this.autocompleteList.innerHTML = "";
+        this.filterTable();
+    }
+}
+
+
+</script>
+<script src="klima_dekoder.js"></script>
+<script src="klima_agro.js"></script>
+<script>
+// <napoveda-jadro>
+// Čistá funkce bez závislosti na DOM: dostane polohu tlačítka (b), rozměry okna (vw, vh) a funkci
+// vyska(sirka), která změří výšku obsahu při dané šířce. Vrátí režim a rozměry/polohu okna nápovědy.
+//   'kotvene' - okno přiléhá k tlačítku (se šipkou) na straně s největším volným místem
+//   'stred'   - nevešlo se: okno uprostřed obrazovky, vlastní zavírací tlačítko
+//   'cela'    - nevešlo se ani tak: celá obrazovka, vertikální posuv
+// pevna (volitelné) = {w, h} pevné rozměry z atributů data-sirka / data-vyska; jinak se použije zlatý řez.
+function napovedaRozhodni(b, vw, vh, vyska, pevna) {
+    const PHI = 1.618033988749895, OKRAJ = 8, SIPKA = 10, MEZERA = 2, MIN_SIRKA = 220, KROK = 16;
+    const omez = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+    const odstup = SIPKA + MEZERA;
+
+    // Zvětšování do volného místa: rozšiřujeme šířku, dokud se obsah nevejde do výšky
+    const zvetsi = (maxW, maxH, w0) => {
+        for (let w = omez(w0, Math.min(MIN_SIRKA, maxW), maxW); ; w += KROK) {
+            if (w > maxW) w = maxW;
+            const h = vyska(w);
+            if (h <= maxH) return { w, h };
+            if (w >= maxW) return null;
+        }
+    };
+
+    // Přirozená velikost: pevná, nebo zlatý řez (na výšku, je-li okno prohlížeče vyšší než širší, jinak na šířku)
+    let nat;
+    if (pevna && pevna.w) {
+        nat = { w: pevna.w, h: pevna.h || vyska(pevna.w), pevna: true };
+    } else {
+        const portret = vh > vw;
+        let w = Math.min(500, vw - 2 * OKRAJ), h = vyska(w);
+        for (let i = 0; i < 6; i++) {          // plocha textu je téměř stálá, tvar se dolaďuje přeměřením
+            const A = w * h;
+            w = omez(Math.sqrt(portret ? A / PHI : A * PHI), Math.min(MIN_SIRKA, vw - 2 * OKRAJ), vw - 2 * OKRAJ);
+            h = vyska(w);
+        }
+        nat = { w, h, pevna: false };
+    }
+
+    // Volné obdélníky kolem tlačítka sahající k hranicím okna; seřazené od největšího
+    const strany = [
+        { strana: 'dole',   maxW: vw - 2 * OKRAJ,                  maxH: vh - b.bottom - odstup - OKRAJ },
+        { strana: 'nahore', maxW: vw - 2 * OKRAJ,                  maxH: b.top - odstup - OKRAJ },
+        { strana: 'vpravo', maxW: vw - b.right - odstup - OKRAJ,   maxH: vh - 2 * OKRAJ },
+        { strana: 'vlevo',  maxW: b.left - odstup - OKRAJ,         maxH: vh - 2 * OKRAJ }
+    ].filter(s => s.maxW >= MIN_SIRKA && s.maxH >= 80)
+     .sort((a, c) => c.maxW * c.maxH - a.maxW * a.maxH);
+
+    // Vycentrování na střed strany tlačítka, omezené hranicí okna
+    const umisti = (s, w, h) => {
+        let left, top, sipka;
+        const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+        if (s === 'dole' || s === 'nahore') {
+            left = omez(cx - w / 2, OKRAJ, vw - OKRAJ - w);
+            top = (s === 'dole') ? b.bottom + odstup : b.top - odstup - h;
+            sipka = omez(cx - left, 16, w - 16);
+        } else {
+            top = omez(cy - h / 2, OKRAJ, vh - OKRAJ - h);
+            left = (s === 'vpravo') ? b.right + odstup : b.left - odstup - w;
+            sipka = omez(cy - top, 16, h - 16);
+        }
+        return { rezim: 'kotvene', strana: s, w, h, left, top, sipka };
+    };
+
+    // 1) přirozená velikost se vejde k tlačítku
+    for (const s of strany) if (nat.w <= s.maxW && nat.h <= s.maxH) return umisti(s.strana, nat.w, nat.h);
+    // 2) zvětšení do volného místa
+    if (!nat.pevna) for (const s of strany) { const r = zvetsi(s.maxW, s.maxH, nat.w); if (r) return umisti(s.strana, r.w, r.h); }
+    // 3) uprostřed okna s vlastním zavíráním
+    const aw = vw - 2 * OKRAJ, ah = vh - 2 * OKRAJ;
+    const r = (nat.w <= aw && nat.h <= ah) ? nat : zvetsi(aw, ah, nat.w);
+    if (r) return { rezim: 'stred', w: r.w, h: r.h, left: (vw - r.w) / 2, top: (vh - r.h) / 2 };
+    // 4) celá obrazovka, posuv uvnitř
+    return { rezim: 'cela', w: vw, h: vh, left: 0, top: 0 };
+}
+
+const SCALES = {
+    "roků": Array.from({length: 2099 - 2011 + 1}, (_, i) => 2011 + i),
+    "dekády": Array.from({length: 36}, (_, i) => `${i + 1}`)
+};
+class MultiSlider {
+            constructor(targetId, scaleType, inputName) {
+                this.targetDiv = document.getElementById(targetId);
+                this.scaleType = scaleType;
+                this.scaleValues = SCALES[scaleType];
+                this.inputName = inputName;
+                
+                this.pairs = [];
+                this.pairCounter = 0;
+                this.gridDensityStep = 1;
+
+                if (!this.targetDiv) {
+                    console.error(`Kontejner s ID "${targetId}" nebyl nalezen.`);
+                    return;
+                }
+
+                this.buildHTML();
+                this.initElements();
+                this.calculateDensity();
+                this.createPair(0, Math.min(10, this.scaleValues.length - 1));
+                this.setupEvents();
+            }
+
+            // Dynamicky vygeneruje HTML strukturu uvnitř předaného divu
+            buildHTML() {
+                this.targetDiv.innerHTML = `
+   <div class="sliderc">
+    <div class="slider-container" id="sliderContainer">
+        <div class="sliderwrapper"></div>
+        <div class="slider-scale-wrapper" id="sliderScaleWrapper"></div>
+        <div class="slider-base-track" id="sliderTrack"></div>
+    </div>
+    <div style="margin-top: 10px;">
+        <button class="resizer3 btn btn-plus" id="addPairBtn" title="Přidat dvojici jezdců">+</button>
+        <button class="resizer3 btn btn-minus" id="removePairBtn" title="Odebrat posledně přidanou dvojici jezdců">-</button>
+    </div>
+   </div>
+                    <input type="hidden" onchange="" id="${this.inputName}" name="${this.inputName}" class="slider-hidden-input">
+                    
+                `;
+            }
+/*<div class="preview-box">Hidden input (<strong>${this.inputName}</strong>): <span class="preview-data">[]</span></div>*/
+            initElements() {
+                this.container = this.targetDiv.querySelector('.slider-container');
+                this.scaleWrapper = this.targetDiv.querySelector('.slider-scale-wrapper');
+                this.trackBase = this.targetDiv.querySelector('.slider-base-track');
+                this.btnPlus = this.targetDiv.querySelector('.btn-plus');
+                this.btnMinus = this.targetDiv.querySelector('.btn-minus');
+                this.hiddenInput = this.targetDiv.querySelector('.slider-hidden-input');
+                this.previewData = this.targetDiv.querySelector('.preview-data');
+            }
+
+            setupEvents() {
+                this.btnPlus.addEventListener('click', () => {
+                    const space = this.findFreeSpaceIndex();
+                    if (space) {
+                        this.createPair(space.start, space.end);
+                        this.updateMinusButtonVisibility();
+                    } else {
+                        return;//alert('Na ose již není dostatek volného místa pro další dvojici!');
+                    }
+                });
+
+                this.btnMinus.addEventListener('click', () => {
+                    if (this.pairs.length > 1) {
+                        const lastPair = this.pairs.pop();
+                        lastPair.trackEl.remove();
+                        lastPair.leftEl.remove();
+                        lastPair.rightEl.remove();
+                        this.updateDOM();
+                        this.updateMinusButtonVisibility();
+                    }
+                });
+
+                // Responzivní přepočet při změně velikosti okna
+                const resizeObserver = new ResizeObserver(() => {
+                    this.calculateDensity();
+                });
+                resizeObserver.observe(this.container);
+            }
+
+            renderScaleStructure() {
+                this.scaleWrapper.innerHTML = '';
+                const stepsCount = this.scaleValues.length;
+                
+                this.scaleValues.forEach((val, index) => {
+                    const pct = (index / (stepsCount - 1)) * 100;
+                    const pointEl = document.createElement('div');
+                    pointEl.className = 'scale-point';
+
+pointEl.style.left = `${pct}%`;
+
+    if (this.scaleType == 'dekády' && val % 3 === 0) { 
+pointEl.innerHTML = `<div class="scale-label">${val}</div> <div class="scale-tick mes"></div>`;
+    } else {
+pointEl.innerHTML = `<div class="scale-label">${val}</div> <div class="scale-tick"></div>`;
+}
+
+this.scaleWrapper.appendChild(pointEl);
+});
+}
+calculateDensity() {
+this.renderScaleStructure(); // Znovuvytvoření prvků stupnice pro správný výpočet šířky
+const containerWidth = this.scaleWrapper.getBoundingClientRect().width || 900;
+const stepsCount = this.scaleValues.length;
+const estimatedLabelWidth = 48;
+const maxLabelsPossible = Math.floor(containerWidth / estimatedLabelWidth);
+let step = 1;
+if (stepsCount > maxLabelsPossible) {
+step = Math.ceil(stepsCount / maxLabelsPossible);
+}
+if (step > 2 && step <= 5) step = 5;
+else if (step > 5 && step <= 10) step = 10;
+else if (step > 10) step = 20;
+this.gridDensityStep = step;
+this.resolveLabelsEngine();
+}
+resolveLabelsEngine() {
+const points = Array.from(this.scaleWrapper.querySelectorAll('.scale-point'));
+const stepsCount = this.scaleValues.length;
+const lastIndex = stepsCount - 1;
+const totalWidthPx = this.scaleWrapper.getBoundingClientRect().width || 900;
+const handleRoles = {};
+this.pairs.forEach(p => {
+if (handleRoles[p.leftIndex] !== 'right') handleRoles[p.leftIndex] = 'left';
+handleRoles[p.rightIndex] = 'right';
+});
+const labelWidth = 46;
+let dataset = [];
+for (let i = 0; i <= lastIndex; i++) {
+const pct = i / lastIndex;
+dataset.push({
+index: i,
+pixelX: pct * totalWidthPx,
+isHandle: handleRoles[i] !== undefined,
+handleRole: handleRoles[i] || null,
+show: false,
+level: 0,
+text: this.scaleValues[i]
+});
+}
+dataset.forEach(p => {
+if (p.index === 0 || p.index === lastIndex || p.index % this.gridDensityStep === 0) {
+p.show = true;
+}
+if (p.index !== lastIndex && p.show) {
+if ((dataset[lastIndex].pixelX - p.pixelX) < labelWidth + 6) {
+p.show = false;
+}
+}
+if (this.scaleType === "roků" && this.gridDensityStep > 1 && p.index !== 0 && p.index !== lastIndex) {
+p.text = `${String(p.text).slice(-2)}`;
+}
+});
+dataset.forEach(p => {
+if (p.isHandle) {
+p.show = true;
+p.text = this.scaleValues[p.index];
+dataset.forEach(other => {
+if (!other.isHandle && other.show) {
+if (Math.abs(p.pixelX - other.pixelX) < labelWidth) {
+other.show = false;
+}
+}
+});
+}
+});
+let occupiedHandleSlotsByLevel = {};
+dataset.forEach(current => {
+if (!current.show) return;
+const slotFrom = current.pixelX - (labelWidth / 2) - 2;
+const slotTo = current.pixelX + (labelWidth / 2) + 2;
+if (current.isHandle) {
+let assignedLevel = 0;
+let searching = true;
+while (searching) {
+if (!occupiedHandleSlotsByLevel[assignedLevel]) {
+searching = false;
+break;
+}
+let collisionWithHandle = occupiedHandleSlotsByLevel[assignedLevel].some(slot => {
+return !(slotTo < slot.from || slotFrom > slot.to);
+});
+if (!collisionWithHandle) {
+let rightHandleOnLeft = dataset.find(item =>
+item.index !== current.index &&
+item.pixelX < current.pixelX &&
+(current.pixelX - item.pixelX) < labelWidth + 4 &&
+item.isHandle && item.handleRole === 'right'
+);
+if (rightHandleOnLeft && current.handleRole === 'left' && assignedLevel === 0) {
+collisionWithHandle = true;
+}
+}
+if (collisionWithHandle) {
+assignedLevel++;
+} else {
+searching = false;
+}
+}
+current.level = assignedLevel;
+if (!occupiedHandleSlotsByLevel[assignedLevel]) {
+occupiedHandleSlotsByLevel[assignedLevel] = [];
+}
+occupiedHandleSlotsByLevel[assignedLevel].push({ from: slotFrom, to: slotTo });
+} else {
+current.level = 0;
+}
+});
+points.forEach((point, index) => {
+const data = dataset[index];
+const labelEl = point.querySelector('.scale-label');
+labelEl.textContent = data.text;
+if (data.show) {
+point.classList.toggle('is-active', data.isHandle);
+const yOffset = data.level * -11;
+labelEl.style.transform = `translateY(${yOffset}px)`;
+labelEl.style.opacity = '1';
+} else {
+point.classList.remove('is-active');
+labelEl.style.opacity = '0';
+}
+});
+}
+createPair(initLeftIndex, initRightIndex) {
+const id = this.pairCounter++;
+const trackEl = document.createElement('div');
+trackEl.className = 'slider-highlight-track';
+const leftEl = document.createElement('div');
+leftEl.className = 'slider-handle';
+const rightEl = document.createElement('div');
+rightEl.className = 'slider-handle';
+this.trackBase.appendChild(trackEl);
+this.trackBase.appendChild(leftEl);
+this.trackBase.appendChild(rightEl);
+const pairObj = { id, leftIndex: initLeftIndex, rightIndex: initRightIndex, trackEl, leftEl, rightEl };
+this.pairs.push(pairObj);
+this.initDrag(leftEl, id, 'left');
+this.initDrag(rightEl, id, 'right');
+this.initDragTrack(trackEl, id); // NOVINKA: Aktivace tahání celého úseku
+this.updateDOM();
+}
+// --- NOVÁ LOGIKA PRO POHYB CELÉHO ÚSEKU NAJEDNOU ---
+initDragTrack(trackEl, pairId) {
+trackEl.addEventListener('pointerdown', (e) => {
+// Ignorujeme, pokud uživatel klikl pravým tlačítkem
+if (e.button !== 0) return;
+trackEl.setPointerCapture(e.pointerId);
+const pair = this.pairs.find(p => p.id === pairId);
+const initialWidthIndices = pair.rightIndex - pair.leftIndex; // Pevná šířka úseku v počtu kroků
+// Zjistíme mantinely zleva a zprava (sousední jezdci nebo kraje osy)
+const leftLimit = this.getLeftLimitIndex(pairId);
+const rightLimit = this.getRightLimitIndex(pairId);
+const startX = e.clientX;
+const startLeftIndex = pair.leftIndex;
+const onPointerMove = (moveEvent) => {
+const rect = this.trackBase.getBoundingClientRect();
+const pxPerIndex = rect.width / (this.scaleValues.length - 1);
+// Kolik kroků (indexů) ujel kurzor od začátku stisknutí
+const deltaX = moveEvent.clientX - startX;
+const indexOffset = Math.round(deltaX / pxPerIndex);
+// Výpočet nových teoretických indexů pro oba jezdce
+let newLeft = startLeftIndex + indexOffset;
+let newRight = newLeft + initialWidthIndices;
+// Kontrola a ořezání pohybu podle levého limitu
+if (newLeft < leftLimit) {
+newLeft = leftLimit;
+newRight = newLeft + initialWidthIndices;
+}
+// Kontrola a ořezání pohybu podle pravého limitu
+if (newRight > rightLimit) {
+newRight = rightLimit;
+newLeft = newRight - initialWidthIndices;
+}
+// Zápis nových souřadnic
+pair.leftIndex = newLeft;
+pair.rightIndex = newRight;
+this.updateDOM();
+};
+const onPointerUp = (upEvent) => {
+trackEl.releasePointerCapture(upEvent.pointerId);
+this.trackBase.removeEventListener('pointermove', onPointerMove);
+this.trackBase.removeEventListener('pointerup', onPointerUp);
+};
+this.trackBase.addEventListener('pointermove', onPointerMove);
+this.trackBase.addEventListener('pointerup', onPointerUp);
+});
+}
+initDrag(handleEl, pairId, type) {
+handleEl.addEventListener('pointerdown', (e) => {
+if (e.button !== 0) return;
+handleEl.setPointerCapture(e.pointerId);
+const onPointerMove = (moveEvent) => {
+const rect = this.trackBase.getBoundingClientRect();
+let pct = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+pct = Math.max(0, Math.min(100, pct));
+const totalSteps = this.scaleValues.length - 1;
+let targetIndex = Math.round((pct / 100) * totalSteps);
+const currentPair = this.pairs.find(p => p.id === pairId);
+if (type === 'left') {
+if (targetIndex > currentPair.rightIndex) targetIndex = currentPair.rightIndex;
+const limitIndex = this.getLeftLimitIndex(pairId);
+if (targetIndex < limitIndex) targetIndex = limitIndex;
+currentPair.leftIndex = targetIndex;
+} else {
+if (targetIndex < currentPair.leftIndex) targetIndex = currentPair.leftIndex;
+const limitIndex = this.getRightLimitIndex(pairId);
+if (targetIndex > limitIndex) targetIndex = limitIndex;
+currentPair.rightIndex = targetIndex;
+}
+this.updateDOM();
+};
+const onPointerUp = (upEvent) => {
+handleEl.releasePointerCapture(upEvent.pointerId);
+this.trackBase.removeEventListener('pointermove', onPointerMove);
+this.trackBase.removeEventListener('pointerup', onPointerUp);
+};
+this.trackBase.addEventListener('pointermove', onPointerMove);
+this.trackBase.addEventListener('pointerup', onPointerUp);
+});
+}
+updateDOM() {
+const totalSteps = this.scaleValues.length - 1;
+this.pairs.forEach(pair => {
+const leftPct = (pair.leftIndex / totalSteps) * 100;
+const rightPct = (pair.rightIndex / totalSteps) * 100;
+pair.leftEl.style.left = `${leftPct}%`;
+pair.rightEl.style.left = `${rightPct}%`;
+pair.trackEl.style.left = `${leftPct}%`;
+pair.trackEl.style.width = `${rightPct - leftPct}%`;
+});
+this.resolveLabelsEngine();
+const dataToSave = this.pairs
+.map(p => ({
+od: this.scaleValues[p.leftIndex],
+do: this.scaleValues[p.rightIndex]
+}))
+.sort((a, b) => this.scaleValues.indexOf(a.od) - this.scaleValues.indexOf(b.od));
+const jsonString = JSON.stringify(dataToSave);
+this.hiddenInput.value = jsonString;
+if (s != 1) posunulSeRokProjekce(this.hiddenInput.id);
+s = 0;
+}
+getLeftLimitIndex(currentId) {
+const current = this.pairs.find(p => p.id === currentId);
+let limitIndex = 0;
+this.pairs.forEach(p => {
+if (p.id !== currentId && p.rightIndex <= current.leftIndex && p.rightIndex > limitIndex) {
+limitIndex = p.rightIndex;
+}
+});
+return limitIndex;
+}
+getRightLimitIndex(currentId) {
+const current = this.pairs.find(p => p.id === currentId);
+let limitIndex = this.scaleValues.length - 1;
+this.pairs.forEach(p => {
+if (p.id !== currentId && p.leftIndex >= current.rightIndex && p.leftIndex < limitIndex) {
+limitIndex = p.leftIndex;
+}
+});
+return limitIndex;
+}
+findFreeSpaceIndex() {
+let intervals = this.pairs.map(p => ({ start: p.leftIndex, end: p.rightIndex }));
+intervals.sort((a, b) => a.start - b.start);
+const lastIndex = this.scaleValues.length - 1;
+let fullTimeline = [{ start: 0, end: 0 }, ...intervals, { start: lastIndex, end: lastIndex }];
+let maxSpace = 0;
+let bestGap = null;
+for (let i = 0; i < fullTimeline.length - 1; i++) {
+let gapStart = fullTimeline[i].end;
+let gapEnd = fullTimeline[i+1].start;
+let gapSize = gapEnd - gapStart;
+if (gapSize > maxSpace) {
+maxSpace = gapSize;
+bestGap = { start: gapStart, end: gapEnd };
+}
+}
+if (maxSpace >= 1) {
+let center = bestGap.start + Math.floor(maxSpace / 2);
+let start = Math.max(bestGap.start, center - 1);
+let end = Math.min(bestGap.end, center + 1);
+return { start, end };
+}
+return null;
+}
+updateMinusButtonVisibility() {
+this.btnMinus.style.display = this.pairs.length > 1 ? 'block' : 'none';
+}
+}
+
+
+var s = 1;
+</script>
+<script>
+// =====================================================================================================
+// AGROKLIMATICKÁ STRÁNKA – aplikační logika (data: klima_dekoder.js + klima_agro.js, druhy: druhy_klima.json)
+// =====================================================================================================
+const URL_REG = 'registrace_klima.json', URL_TILES = 'get_klima_post.php', URL_DRUHY = 'druhy_klima.json';
+const KA = KlimaAgro;
+const ZELENE = ['hsl(90, 50%, 92%)', 'hsl(90, 50%, 72%)', 'hsl(97, 62%, 60%)', 'hsl(104, 74%, 45%)', 'hsl(111, 86%, 35%)', 'hsl(118, 98%, 20%)'];
+const POTENCIAL_POZN = 'počítá se jen z teploty (nejnižší, průměrná, teplotní sumy), ročního úhrnu srážek a délky bezmrazového období. Nezahrnuje evapotranspiraci (výpar), půdu, vodní bilanci a závlahu, sklon a expozici terénu, vítr, škůdce a nemoci ani odrůdy; tyto údaje mohou výsledek zásadně změnit. Je to orientační srovnání lokalit, ne předpověď úrody.';
+const POTENCIAL_KRATCE = 'Jen z teploty, srážek a bezmrazového období; bez evapotranspirace, půdy a vodní bilance, které mohou výsledek zásadně změnit.';
+const MEZE = {   // hranice 6 tříd barev v mapě (5 mezí)
+    tnn: [-30, -20, -10, -5, 0], fd: [10, 50, 100, 150, 200], jarniMraz: [6, 10, 14, 22, 28], podzimniMraz: [6, 10, 14, 22, 28],
+    bezmrazi: [30, 90, 150, 210, 270], tg: [0, 5, 10, 15, 20], tn: [-15, -5, 0, 5, 10], tx: [5, 10, 15, 20, 25], txx: [25, 30, 35, 40, 45],
+    su20: [10, 40, 80, 120, 180], su25: [5, 20, 50, 90, 140], su30: [2, 10, 30, 60, 100], su35: [1, 5, 15, 30, 60], tr: [1, 5, 20, 50, 100],
+    vegSezona: [60, 120, 180, 240, 300], rr1: [30, 60, 100, 140, 180], r20: [1, 3, 6, 10, 15], sdii: [4, 6, 8, 10, 14],
+    srazky: [250, 500, 1000, 1500, 2500], potencial: [10, 20, 40, 60, 80]
+};
+const ROZSAH = {   // [min, max, krok] pro multislider rozsahů v nastavení parametru
+    tnn: [-50, 15, 1], fd: [0, 365, 5], jarniMraz: [1, 36, 1], podzimniMraz: [1, 36, 1], bezmrazi: [0, 365, 5], tg: [-20, 35, 1],
+    tn: [-30, 30, 1], tx: [-20, 45, 1], txx: [10, 55, 1], su20: [0, 360, 10], su25: [0, 360, 10], su30: [0, 240, 5], su35: [0, 120, 5],
+    tr: [0, 120, 5], vegSezona: [0, 365, 5], rr1: [0, 220, 5], r20: [0, 40, 1], sdii: [0, 60, 1], srazky: [0, 4000, 50]
+};
+const MEZ_RIZIKA = { tnn: -15, txx: 38, su30: 30, su35: 5, bezmrazi: 120, vegSezona: 150, sdii: 15, srazky: 400 };
+const HUE2 = [14, 44, 74, 104, 234, 264];                 // odstín prvního parametru ve dvojici (jako BEDD v bdd)
+const POPIS_TRID = { tnn: '°C', tg: '°C', tn: '°C', tx: '°C', txx: '°C' };
+const SC = { zima: 'hsl(205, 70%, 90%)', jaro: 'hsl(100, 60%, 88%)', leto: 'hsl(50, 95%, 85%)', podzim: 'hsl(25, 75%, 86%)', neutral: 'hsl(0, 0%, 94%)' };
+
+let reg = null, K = null, druhy = null, maskaBity = null, PX = 0, T = 30;
+let vybrane = [];                       // pořadí zaškrtnutí parametrů pro graf/výpis
+let potencialVybran = false;
+let nast = {};                          // nastavení parametrů: {id: {rozsahy:[{od,do}], mez:number}}
+let mapaVyber = [], mapaPot = false;
+const polozky = () => (mapaPot ? ['potencial'] : []).concat(mapaVyber);   // pořadí v mapě: potenciál první    // parametry zobrazené v mapě (nanejvýš 2) / potenciál
+let lok = null;                         // zvolená lokalita {lat, lon, row, col, tid, k, jih}
+let lokData = null;                     // dekódovaná buňka lokality
+let sliderDekady = null, sliderRoky = null;
+const dlazdice = new Map(), kmapy = new Map(), memo = new Map(), cekajici = new Map();
+const LIMIT_DLAZDIC = 48, OKNO_POT = 5;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const cislo = (v, d = 1) => (v === null || v === undefined || v !== v) ? '–' : Number(v).toFixed(d).replace('.', ',');
+
+// ---------------------------------------------------------------------------------------------------
+// multislider: sdílená funkce pro oznámení změny (volá ji třída MultiSlider)
+// ---------------------------------------------------------------------------------------------------
+let casovacZmen = null, ignorujDo = 0;
+function posunulSeRokProjekce(idVstupu) {
+    if (Date.now() < ignorujDo) return;
+    clearTimeout(casovacZmen);
+    casovacZmen = setTimeout(() => naZmenuSlideru(idVstupu), 120);
+}
+function naZmenuSlideru(id) {
+    if (id && id.indexOf('nast_') === 0) {
+        const pid = id.slice(5), inp = $(id); if (!inp) return;
+        try { (nast[pid] = nast[pid] || {}).rozsahy = JSON.parse(inp.value || '[]').map(r => ({ od: parseFloat(r.od), do: parseFloat(r.do) })); } catch (e) { }
+        memo.clear(); obnovGraf(); return;
+    }
+    memo.clear(); obnovGraf(); obnovMapu();
+}
+function pairValues(inputId) {
+    const inp = $(inputId); if (!inp || !inp.value) return null;
+    try { return JSON.parse(inp.value); } catch (e) { return null; }
+}
+function maskaDekad() {
+    const m = new Uint8Array(36), p = pairValues('vybrane_dekady');
+    if (!p || !p.length) return KA.maskaVse();
+    p.forEach(r => { for (let d = parseInt(r.od, 10) - 1; d <= parseInt(r.do, 10) - 1; d++) if (d >= 0 && d < 36) m[d] = 1; });
+    return m;
+}
+function rokyVybrane() {                              // indexy vybraných roků ze všech rozsahů jezdců (vzestupně)
+    const p = pairValues('vybrane_roky'), a = [];
+    if (p && p.length) p.forEach(r => { for (let y = parseInt(r.od, 10) - reg.rok_od; y <= parseInt(r.do, 10) - reg.rok_od; y++) if (y >= 0 && y < K.NY && a.indexOf(y) < 0) a.push(y); });
+    if (!a.length) for (let y = 0; y < K.NY; y++) a.push(y);
+    return a.sort((x, y) => x - y);
+}
+function rozsahRoku() {
+    const p = pairValues('vybrane_roky'); if (!p || !p.length) return [0, K.NY - 1];
+    return [Math.max(0, parseInt(p[0].od, 10) - reg.rok_od), Math.min(K.NY - 1, parseInt(p[p.length - 1].do, 10) - reg.rok_od)];
+}
+
+// ---------------------------------------------------------------------------------------------------
+// barevné rozdělení ročních dob v multislideru dekád
+// ---------------------------------------------------------------------------------------------------
+const RUST_BARVY = ['hsl(230, 100%, 97%)', 'hsl(100, 73%, 83%)', 'hsl(112, 80%, 73%)'], RUST_PRAH = [290, 390], RUST_ZPOZDENI = 15;
+let rustUrovne = new Array(36).fill(0);
+function slunce(lat, doy) {                          // průměrný denní příkon slunečního záření na horní hranici atmosféry, W/m²
+    const f = Math.max(-89.9, Math.min(89.9, lat)) * Math.PI / 180, dl = 0.409 * Math.sin(2 * Math.PI * (doy - 81) / 365);
+    const hh = Math.acos(Math.max(-1, Math.min(1, -Math.tan(f) * Math.tan(dl))));
+    return 1361 / Math.PI * (hh * Math.sin(f) * Math.sin(dl) + Math.cos(f) * Math.cos(dl) * Math.sin(hh));
+}
+function urovenRustu(lat, d) {                       // 0 = bez růstu, 1 = růst rostlin v přírodě, 2 = převládající růst zemědělských plodin
+    const doy = ((d * 10.14 + 5.07 - RUST_ZPOZDENI) % 365 + 365) % 365, q = slunce(lat, doy);   // zpoždění kvůli ohřevu půdy
+    return q >= RUST_PRAH[1] ? 2 : q >= RUST_PRAH[0] ? 1 : 0;
+}
+function nastavSezony(lat0, lat1) {                  // jedna šířka = přesné souřadnice; dvě = největší rozsah v zobrazené mapě
+    if (lat1 === undefined) lat1 = lat0;
+    const u = new Array(36).fill(0), n = lat1 === lat0 ? 0 : 8;
+    for (let k = 0; k <= n; k++) { const lat = n ? lat0 + (lat1 - lat0) * k / n : lat0; for (let d = 0; d < 36; d++) u[d] = Math.max(u[d], urovenRustu(lat, d)); }
+    rustUrovne = u;
+    const w = document.querySelector('#slider-dekady-kontejner .sliderwrapper'); if (!w) return;
+    const st = [];
+    for (let d = 0; d < 36; d++) { const a = Math.max(0, (d - 0.5) / 35) * 100, b = Math.min(100, (d + 0.5) / 35 * 100); st.push(`${RUST_BARVY[u[d]]} ${a.toFixed(3)}%`, `${RUST_BARVY[u[d]]} ${b.toFixed(3)}%`); }
+    w.style.background = 'linear-gradient(to right, ' + st.join(', ') + ')'; w.style.borderRadius = '4px';
+    const kd = $('slider-dekady-kontejner');
+    if (kd) w.title = 'Dekády v roce. Světle zelená = začátek a konec růstu rostlin v přírodě, sytě zelená = převládající růst zemědělských plodin (podle množství slunce; ' + (lat1 === lat0 ? 'souřadnice zvolené lokality' : 'rozsah zobrazené mapy') + ').';
+}
+function nastavSezonyMapa() { const b = map.getBounds(); nastavSezony(Math.max(-85, b.getSouth()), Math.min(85, b.getNorth())); }
+function rozsahyRustu(min) {                         // souvislé rozsahy dekád s úrovní růstu alespoň min
+    const r = []; let a = -1;
+    for (let d = 0; d <= 36; d++) { const ok = d < 36 && rustUrovne[d] >= min; if (ok && a < 0) a = d; if (!ok && a >= 0) { r.push([a, d - 1]); a = -1; } }
+    return r.length ? r : null;
+}
+function nastavDekady(spec) {                           // spec: pole [od, do] indexů 0..35
+    const s = sliderDekady; while (s.pairs.length > 1) s.btnMinus.click();
+    s.pairs[0].leftIndex = spec[0][0]; s.pairs[0].rightIndex = spec[0][1];
+    for (let i = 1; i < spec.length; i++) s.createPair(spec[i][0], spec[i][1]);
+    s.updateDOM(); s.updateMinusButtonVisibility();
+}
+function predvolbaDekad(typ) {
+    const jih = lok ? lok.jih : false;
+    if (typ === 'rok') nastavDekady([[0, 35]]);
+    else if (typ === 'veg') nastavDekady(rozsahyRustu(1) || (jih ? [[0, 11], [27, 35]] : [[9, 29]]));        // duben–říjen (sever), říjen–duben (jih)
+    else if (typ === 'zima') nastavDekady(jih ? [[15, 26]] : [[0, 8], [33, 35]]);        // prosinec–únor, na jihu červen–srpen
+}
+
+// ---------------------------------------------------------------------------------------------------
+// bubliny (plovoucí okna, rozhodování viz napovedaRozhodni)
+// ---------------------------------------------------------------------------------------------------
+class Bublina {
+    constructor(tlacitko, okno, opts) {
+        this.tl = tlacitko; this.okno = okno; this.opts = opts || {};
+        this.obsah = okno.querySelector('.napoveda-obsah'); this.sipka = okno.querySelector('.napoveda-sipka');
+        this.zavrit = okno.querySelector('.napoveda-zavrit'); this.zavesa = $('napoveda-zavesa');
+        this.otevrena = false; this.odpojena = false; this.naplanovano = false;
+        this.zavrit.addEventListener('click', () => this.zavri());
+        window.addEventListener('resize', () => this.prepocitej());
+        panel.addEventListener('scroll', () => this.prepocitej());
+        Bublina.vse.push(this);
+    }
+    vyska(sirka) {
+        const o = this.okno; o.style.width = sirka + 'px'; o.style.height = 'auto'; o.style.maxHeight = 'none';
+        return Math.ceil(o.getBoundingClientRect().height);
+    }
+    zobraz() {
+        const o = this.okno, vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight, b = this.tl.getBoundingClientRect();
+        if (b.width === 0 || b.bottom <= 0 || b.top >= vh || b.right <= 0 || b.left >= vw) { this.zavri(); return; }
+        const posuv = this.obsah.scrollTop;
+        o.style.visibility = 'hidden'; o.style.display = 'flex'; o.classList.remove('cela'); o.style.left = '0px'; o.style.top = '0px';
+        const ds = parseFloat(o.dataset.sirka), dv = parseFloat(o.dataset.vyska);
+        const u = napovedaRozhodni(b, vw, vh, s => this.vyska(s), ds > 0 ? { w: ds, h: dv > 0 ? dv : 0 } : null);
+        o.classList.toggle('cela', u.rezim === 'cela');
+        o.style.width = u.w + 'px'; o.style.height = u.h + 'px'; o.style.left = u.left + 'px'; o.style.top = u.top + 'px';
+        const kot = u.rezim === 'kotvene'; this.odpojena = !kot;
+        this.sipka.style.display = kot ? 'block' : 'none'; this.zavrit.style.display = 'block';
+        this.zavesa.style.display = Bublina.vse.some(x => (x === this ? !kot : (x.otevrena && x.odpojena))) ? 'block' : 'none';
+        if (kot) {
+            const sp = this.sipka; sp.className = 'napoveda-sipka ' + u.strana;
+            sp.style.left = sp.style.right = sp.style.top = sp.style.bottom = 'auto';
+            if (u.strana === 'dole') { sp.style.top = '-8px'; sp.style.left = (u.sipka - 8) + 'px'; }
+            if (u.strana === 'nahore') { sp.style.bottom = '-8px'; sp.style.left = (u.sipka - 8) + 'px'; }
+            if (u.strana === 'vpravo') { sp.style.left = '-8px'; sp.style.top = (u.sipka - 8) + 'px'; }
+            if (u.strana === 'vlevo') { sp.style.right = '-8px'; sp.style.top = (u.sipka - 8) + 'px'; }
+        }
+        o.style.zIndex = String(2000 + Bublina.vse.filter(x => x.otevrena).length);
+        o.style.visibility = 'visible'; this.obsah.scrollTop = posuv;
+    }
+    otevri() { Bublina.vse.forEach(x => { if (x !== this && x.opts.exkluzivni && this.opts.exkluzivni) x.zavri(); }); this.otevrena = true; Bublina.poradi = Bublina.poradi.filter(x => x !== this); Bublina.poradi.push(this); this.zobraz(); if (this.opts.priOtevreni) this.opts.priOtevreni(); }
+    zavri() {
+        this.otevrena = false; this.odpojena = false; this.okno.style.display = 'none';
+        Bublina.poradi = Bublina.poradi.filter(x => x !== this);
+        Bublina.vse.forEach(x => { if (x.rodic === this && x.otevrena) x.zavri(); });
+        if (!Bublina.vse.some(x => x.otevrena && x.odpojena)) this.zavesa.style.display = 'none';
+        if (this.opts.priZavreni) this.opts.priZavreni();
+    }
+    prepocitej() {
+        if (!this.otevrena || this.naplanovano) return; this.naplanovano = true;
+        requestAnimationFrame(() => { this.naplanovano = false; if (this.otevrena) this.zobraz(); });
+    }
+    prepni() { if (!this.otevrena) this.otevri(); else if (!this.odpojena) this.zavri(); }
+}
+Bublina.vse = []; Bublina.poradi = [];
+document.addEventListener('mousedown', e => {          // klik mimo poslední otevřenou bublinu ji zavře (pak předchozí atd.)
+    const p = Bublina.poradi; if (!p.length) return;
+    const b = p[p.length - 1];
+    if (b.okno.contains(e.target) || b.tl.contains(e.target)) return;
+    b.zavri();
+}, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { const o = Bublina.vse.filter(x => x.otevrena); if (o.length) o[o.length - 1].zavri(); } });
+
+function vytvorOknoBubliny(id, sirka) {
+    const d = document.createElement('div'); d.id = id; d.className = 'napoveda-okno'; if (sirka) d.dataset.sirka = sirka;
+    d.innerHTML = '<div class="napoveda-sipka"></div><button class="napoveda-zavrit resizer3" style="background: hsl(0, 100%, 90%);" type="button" title="Zavřít">×</button><div class="napoveda-obsah"></div>';
+    document.body.appendChild(d); return d;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// bublina „Parametry“ (graf a výpis) a nastavení parametrů
+// ---------------------------------------------------------------------------------------------------
+let bublParam, bublNast, bublMapa;
+function sestavParametry() {
+    const o = bublParam.okno.querySelector('.napoveda-obsah');
+    let h = '<div style="padding:8px 12px 10px 12px;"><div style="font-weight:bold;margin-bottom:6px;text-align:center;">Vyberte zemědělský klimatický parametr</div><div class="sk-wrap">';
+    KA.SKUPINY.forEach(sk => {
+        const ps = KA.PARAMETRY.filter(p => p.skupina === sk.id);
+        h += '<div class="sk-box">';
+        if (sk.id === 'potencial') h += `<label class="pol"><input type="checkbox" id="pp_potencial" ${druhy ? '' : 'disabled'}> <b>${esc(sk.nazev)}</b></label>`;
+        //<div class="pozn" style="max-width:240px;color:#8a4b00;"><b>Pozor:</b> ${POTENCIAL_KRATCE}</div>
+        else {
+            h += '<div class="skupina" style=" margin-bottom: 10px;left: -8px;position: relative;">' + (ps.length > 1 ? `<label class="pol" style=""><input type="checkbox" class="sk-vse" data-sk="${sk.id}"> ${esc(sk.nazev)}</label>` : esc(sk.nazev)) + '</div>';
+            ps.forEach(p => {
+                h += `<div class="skuro"><label class="pol"><input type="checkbox" id="pp_${p.id}" data-id="${p.id}"> ${esc(p.nazev)}${p.presne ? '' : ' <span class="pozn" title="Přibližná hodnota">≈</span>'}</label>` +
+                    `<button type="button" class="klic resizer3" id="kl_${p.id}" data-id="${p.id}" title="Nastavení rozsahů a meze rizika: ${esc(p.nazev)}" style="display:none;background: rgb(253, 255, 204);">&#128295;</button></div>`;
+            });
+        }
+        h += '</div>';
+    });
+    h += '</div><div class="pozn" style="margin-top:6px;text-align:center;"> ≈ přibližná hodnota (z dekádního odhadu); ostatní jsou v databázi přesné.</div></div>';
+    o.innerHTML = h;
+    o.querySelectorAll('input[data-id]').forEach(c => c.addEventListener('change', () => zmenaParametru(c.dataset.id, c.checked)));
+    o.querySelectorAll('.sk-vse').forEach(c => c.addEventListener('change', () => {
+        KA.PARAMETRY.filter(p => p.skupina === c.dataset.sk).forEach(p => { $('pp_' + p.id).checked = c.checked; vybrane = vybrane.filter(x => x !== p.id); if (c.checked) vybrane.push(p.id); });
+        aktualizujVyber();
+    }));
+    $('pp_potencial').addEventListener('change', e => zmenaPotencialu(e.target.checked));
+    o.querySelectorAll('button.klic').forEach(b => b.addEventListener('click', () => otevriNastaveni(b.dataset.id, b)));
+}
+function zmenaParametru(id, on) {
+    if (on) { if (vybrane.indexOf(id) < 0) vybrane.push(id); } else vybrane = vybrane.filter(x => x !== id);
+    aktualizujVyber();
+}
+function zmenaPotencialu(on) { potencialVybran = on; aktualizujVyber(); }
+function aktualizujVyber() {
+    KA.PARAMETRY.forEach(p => { const b = $('kl_' + p.id); if (b) b.style.display = vybrane.indexOf(p.id) >= 0 ? 'inline-block' : 'none'; });
+    document.querySelectorAll('.sk-vse').forEach(c => {
+        const ps = KA.PARAMETRY.filter(p => p.skupina === c.dataset.sk), n = ps.filter(p => vybrane.indexOf(p.id) >= 0).length;
+        c.checked = n === ps.length; c.indeterminate = n > 0 && n < ps.length;
+    });
+    const jeVyber = vybrane.length > 0 || potencialVybran;
+    $('vysv').style.display = jeVyber ? 'none' : 'block';
+    ['gps-blok', 'dekady-blok', 'tabs-blok'].forEach(i => { $(i).style.display = jeVyber ? 'block' : 'none'; });
+    const nazvy = (potencialVybran ? ['Klimatický zemědělský potenciál'] : []).concat(vybrane.map(i => KA.PARAM[i].nazev));
+    $('btn-parametry').textContent = nazvy.length ? nazvy[0] + (nazvy.length > 1 ? '...' : '') : 'Parametry';
+    $('vybrane-prehled').textContent = nazvy.length ? 'Vybráno: ' + nazvy.join('; ') : '';
+    $('btn-parametry').title = nazvy.length ? nazvy.join('; ') : 'Vyberte zemědělský klimatický parametr';
+    if (jeVyber) setTimeout(() => { sliderDekady.calculateDensity(); if (sliderRoky) sliderRoky.calculateDensity(); }, 0);
+    mapaVyber = mapaVyber.filter(x => vybrane.indexOf(x) >= 0); if (!potencialVybran) mapaPot = false;
+    if (bublMapa) { sestavMapaBublinu(); memo.clear(); obnovMapu(); }
+    obnovGraf();
+}
+function otevriNastaveni(id, tlacitko) {
+    const p = KA.PARAM[id], r = ROZSAH[id]; if (!r) return;
+    const o = bublNast.okno.querySelector('.napoveda-obsah');
+    const st = (nast[id] = nast[id] || {});
+    const mez = st.mez !== undefined ? st.mez : (MEZ_RIZIKA[id] !== undefined ? MEZ_RIZIKA[id] : null);
+    const SK = 'nast_' + id;
+    SCALES[SK] = []; for (let v = r[0]; v <= r[1] + 1e-9; v += r[2]) SCALES[SK].push(String(Math.round(v * 100) / 100));
+    o.innerHTML = `<div style="padding:8px 12px 10px 12px;"><div style="font-weight:bold;">${esc(p.nazev)}</div>` +
+        `<div class="pozn" style="margin:4px 0 6px 0;"><b>Rozsah</b> = pásmo hodnot (${esc(p.jedn)}), které vaší plodině vyhovuje; v grafu se vykreslí jako pás a výpis uvede podíl let v pásmu (např. u nejnižší teploty −20 až 0 °C pro druh, který snese mráz do −20 °C). <b>Mez rizika</b> = jedna hranice; výpis uvede, v kolika letech je hodnota pod (nebo nad) ní. Obojí je ve výchozím stavu vypnuto a týká se jen grafu a výpisu, ne mapy.</div>` +
+        `<div style="margin:2px 0 6px 0;"><label style="font-size:13px;">Trend: <select id="tr_${id}" style="width:auto;display:inline-block;">${[['zadny', 'nezobrazovat trend'], ['dek', 'po dekádách'], ['rok', 'po roce'], ['3', 'po 3 letech'], ['5', 'po 5 letech'], ['10', 'po 10 letech'], ['30', 'po 30 letech']].map(a => `<option value="${a[0]}"${trendMod(id) === a[0] ? ' selected' : ''}>${a[1]}</option>`).join('')}</select></label><div class="pozn">Průměr stejné dekády (roku) předchozích a následných let se započtením počítané hodnoty; chybějící hodnoty na okrajích řady se vynechají. V mapě se počítá roční průměr z vybraných dekád.</div></div>${p.skupina === 'dny' ? `<div style="margin:2px 0 6px 0;"><label style="font-size:13px;">Zobrazení v grafu: <select id="zo_${id}" style="width:auto;display:inline-block;"><option value="sloupce"${zobrazMod(id) === 'sloupce' ? ' selected' : ''}>sloupce (skládané)</option><option value="krivka"${zobrazMod(id) === 'krivka' ? ' selected' : ''}>křivka</option></select></label></div>` : ''}<label class="pol"><input type="checkbox" id="zr_${id}" ${st.zobrazRozsahy ? 'checked' : ''}> Zobrazit rozsahy v grafu a výpisu</label><div id="slider-${SK}-kontejner"></div>` +
+        (mez !== null && p.riziko ? `<div style="margin-top:8px;"><label class="pol"><input type="checkbox" id="zm_${id}" ${st.zobrazMez ? 'checked' : ''}> Použít mez rizika ve výpisu</label><br><label style="font-size:13px;">Mez rizika (${p.riziko === 'pod' ? 'hodnota pod' : 'hodnota nad'} v ${esc(p.jedn)}):</label> <input type="number" id="mez_${id}" value="${mez}" step="any" style="width:90px;"></div>` : '') + '</div>';
+    ignorujDo = Infinity;
+    const sl = new MultiSlider(`slider-${SK}-kontejner`, SK, SK);
+    const uloz = nast[id].rozsahy, nn = SCALES[SK].length;
+    while (sl.pairs.length > 1) sl.btnMinus.click();
+    const ix = v => Math.max(0, SCALES[SK].findIndex(x => parseFloat(x) >= v));
+    if (uloz && uloz.length) {
+        sl.pairs[0].leftIndex = ix(uloz[0].od); sl.pairs[0].rightIndex = Math.max(ix(uloz[0].do), sl.pairs[0].leftIndex);
+        for (let i = 1; i < uloz.length; i++) sl.createPair(ix(uloz[i].od), ix(uloz[i].do));
+    } else { sl.pairs[0].leftIndex = Math.floor(nn * 0.3); sl.pairs[0].rightIndex = Math.floor(nn * 0.7); }
+    sl.updateDOM(); sl.updateMinusButtonVisibility();
+    ignorujDo = 0;
+    if (!(uloz && uloz.length)) naZmenuSlideru(SK);
+    const tr = $('tr_' + id); if (tr) tr.addEventListener('change', () => { nast[id].trend = tr.value; memo.clear(); obnovGraf(); obnovMapu(); });
+    const zo = $('zo_' + id); if (zo) zo.addEventListener('change', () => { nast[id].zobrazeni = zo.value; obnovGraf(); });
+    const zr = $('zr_' + id), zm = $('zm_' + id);
+    if (zr) zr.addEventListener('change', () => { nast[id].zobrazRozsahy = zr.checked; obnovGraf(); });
+    if (zm) zm.addEventListener('change', () => { nast[id].zobrazMez = zm.checked; });
+    const mi = $('mez_' + id); if (mi) mi.addEventListener('change', () => { nast[id].mez = parseFloat(mi.value); obnovGraf(); });
+    bublNast.tl = tlacitko; bublNast.okno.dataset.sirka = '430'; bublNast.otevri();
+    setTimeout(() => { sl.calculateDensity(); bublNast.prepocitej(); }, 0);
+}
+
+// ---------------------------------------------------------------------------------------------------
+// bublina výběru parametrů pro mapu
+// ---------------------------------------------------------------------------------------------------
+function sestavMapaBublinu() {
+    const o = bublMapa.okno.querySelector('.napoveda-obsah');
+    const pot = potencialVybran && druhy, ps = KA.PARAMETRY.filter(p => vybrane.indexOf(p.id) >= 0);
+    let h = '<div style="padding:8px 12px 10px 12px;"><div style="font-weight:bold;margin-bottom:6px;">Pro zobrazení v mapě můžete vybrat nanejvýš dva parametry</div>';
+    h += '<label class="pol"><input type="checkbox" id="mp_nic" style="margin-bottom: 8px;"> <b>Nezobrazovat v mapě</b></label><br>';
+    ps.forEach(p => { h += `<label class="pol"><input type="checkbox" class="mp" data-id="${p.id}"> ${esc(p.nazev)}${p.presne ? '' : ' <span class="pozn">≈</span>'}</label><br>`; });
+    if (pot) h += '<label class="pol pol-pot"><input type="checkbox" id="mp_potencial"> <b>Klimatický zemědělský potenciál</b></label>';
+    if (!pot && !ps.length) h += '<div class="pozn">Nejprve tlačítkem Parametry vyberte, co chcete sledovat.</div>';
+    o.innerHTML = h + '</div>';
+    o.querySelectorAll('input.mp').forEach(c => { c.checked = mapaVyber.indexOf(c.dataset.id) >= 0; c.addEventListener('change', () => mapaZmena(c.dataset.id, c.checked)); });
+    const mp = $('mp_potencial'); if (mp) { mp.checked = mapaPot; mp.addEventListener('change', e => mapaZmena('potencial', e.target.checked)); }
+    $('mp_nic').checked = !mapaPot && !mapaVyber.length;
+    $('mp_nic').addEventListener('change', e => mapaZmena('nic', e.target.checked));
+}
+function mapaZmena(id, on) {
+    if (id === 'nic') { if (on) { mapaVyber = []; mapaPot = false; } }
+    else if (id === 'potencial') { mapaPot = on; if (on) mapaVyber = mapaVyber.slice(-1); }
+    else if (on) { mapaVyber = mapaVyber.filter(x => x !== id); mapaVyber.push(id); while (mapaVyber.length + (mapaPot ? 1 : 0) > 2) mapaVyber.shift(); }
+    else mapaVyber = mapaVyber.filter(x => x !== id);
+    const nic = !mapaPot && mapaVyber.length === 0;
+    $('mp_nic').checked = nic; if ($('mp_potencial')) $('mp_potencial').checked = mapaPot;
+    document.querySelectorAll('#bubl-mapa input.mp').forEach(c => { c.checked = mapaVyber.indexOf(c.dataset.id) >= 0; });
+    memo.clear(); obnovMapu();
+}
+
+// ---------------------------------------------------------------------------------------------------
+// data: dlaždice, buňky
+// ---------------------------------------------------------------------------------------------------
+function jeSusi(row, col) { if (row < 0 || row >= reg.mrizka.radku || col < 0 || col >= reg.mrizka.ncols) return false; const i = row * reg.mrizka.ncols + col; return (maskaBity[i >> 3] >> (7 - (i & 7))) & 1; }
+function najdiBunku(lat, lon) {
+    const m = reg.mrizka; let L = lon; while (L < -180) L += 360; while (L >= 180) L -= 360;
+    const row = Math.round((m.lat0 - lat) / m.dy), col = Math.round((L - m.lon0) / m.dx);
+    const c = ((col % m.ncols) + m.ncols) % m.ncols;
+    if (!jeSusi(row, c)) return null;
+    const tid = Math.floor(row / T) * PX + Math.floor(c / T);
+    return { row, col: c, tid, lat: m.lat0 - row * m.dy, lon: m.lon0 + c * m.dx, jih: (m.lat0 - row * m.dy) < 0 };
+}
+function kmapa(tid) {
+    let k = kmapy.get(tid); if (k) return k;
+    const m = reg.mrizka, tx = tid % PX, ty = Math.floor(tid / PX); k = new Int16Array(T * T).fill(-1); let n = 0;
+    for (let r = ty * T; r < Math.min((ty + 1) * T, m.radku); r++) for (let c = tx * T; c < Math.min((tx + 1) * T, m.ncols); c++) if (jeSusi(r, c)) k[(r - ty * T) * T + (c - tx * T)] = n++;
+    kmapy.set(tid, k); return k;
+}
+function indexVDlazdici(b) { return kmapa(b.tid)[(b.row - Math.floor(b.row / T) * T) * T + (b.col - Math.floor(b.col / T) * T)]; }
+// Dlaždice se stahuje po částech podle potřeby: 'rocni' (přesné roční hodnoty), 'model' (základ + index), 'tnn' (TNn po dekádách).
+// Požadavky se 120 ms sbírají a odesílají společně (po nejvýše 64 dlaždicích).
+const fronta = { rocni: new Set(), model: new Set(), tnn: new Set() }, slib = new Map();
+let casovacFronty = null;
+function pozadej(ids, casti) {
+    const ps = [];
+    for (const id of ids) for (const c of casti) {
+        const t = dlazdice.get(id);
+        if (t === null || (t && t.casti[c])) continue;
+        const kl = c + ':' + id; let z = slib.get(kl);
+        if (!z) { z = {}; z.p = new Promise((res, rej) => { z.res = res; z.rej = rej; }); z.p.catch(() => { }); slib.set(kl, z); fronta[c].add(id); }
+        ps.push(z.p);
+    }
+    if (ps.length) { clearTimeout(casovacFronty); casovacFronty = setTimeout(spustFrontu, 120); }
+    return Promise.all(ps);
+}
+async function spustFrontu() {
+    const prace = [];
+    Object.keys(fronta).forEach(c => {
+        const ids = Array.from(fronta[c]); fronta[c].clear();
+        for (let a = 0; a < ids.length; a += 64) prace.push(stahniDavku(c, ids.slice(a, a + 64)));
+    });
+    await Promise.all(prace);
+}
+async function stahniDavku(c, davka) {
+    try {
+        const r = await fetch(URL_TILES, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tile_ids: davka, cast: c }) });
+        if (!r.ok) throw new Error('Server vrátil chybu ' + r.status);
+        const bloky = K.parsujStream(await r.arrayBuffer());
+        // objekt dlaždice se vytvoří hned (před asynchronním rozbalením), aby se části stažené současně spojily do jednoho
+        davka.forEach((id, i) => { if (bloky[i] && !dlazdice.get(id)) dlazdice.set(id, { n: 0, sek: {}, casti: {}, exc: { n: 0, bunka: new Uint16Array(0), t: new Uint16Array(0), val: new Uint16Array(0) } }); });
+        for (let i = 0; i < davka.length; i++) {
+            const id = davka[i];
+            if (bloky[i]) await K.rozbalGzip(bloky[i], c, dlazdice.get(id));
+            else if (c === 'rocni' && !dlazdice.get(id)) dlazdice.set(id, null);
+            const z = slib.get(c + ':' + id); if (z) { z.res(); slib.delete(c + ':' + id); }
+        }
+        while (dlazdice.size > LIMIT_DLAZDIC) { const k0 = dlazdice.keys().next().value; if (davka.indexOf(k0) >= 0) break; dlazdice.delete(k0); }
+    } catch (e) {
+        davka.forEach(id => { const z = slib.get(c + ':' + id); if (z) { z.rej(e); slib.delete(c + ':' + id); } });
+    }
+}
+function bunkaData(b, y0, y1) {                     // dekódování buňky pro roky y0..y1 (výchozí všechny)
+    const tile = dlazdice.get(b.tid); if (!tile) return null;
+    const k = indexVDlazdici(b); if (k < 0 || k >= tile.n) return null;
+    return { R: K.dekodujBunku(tile, k, b.jih, y0, y1), roc: K.rocni(tile, k), y0, y1 };
+}
+
+// ---------------------------------------------------------------------------------------------------
+// mapa
+// ---------------------------------------------------------------------------------------------------
+const map = L.map('mapa-kontainer').setView([50.62, 15.09], 6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22, attribution: '© OpenStreetMap' }).addTo(map);
+L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
+let vrstva = null, znacka = null;
+
+function tridaHodnoty(v, meze) { let i = 0; while (i < meze.length && v >= meze[i]) i++; return i; }
+function hsl(h, s, l) {
+    s /= 100; l /= 100; const a = s * Math.min(l, 1 - l), f = n => { const k = (n + h / 30) % 12; return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
+    return [Math.round(255 * f(0)), Math.round(255 * f(8)), Math.round(255 * f(4))];
+}
+const RGB_ZELENE = ZELENE.map(c => { const m = c.match(/hsl\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%/); return hsl(+m[1], +m[2], +m[3]); });
+const SVETLOST2 = [92, 80, 66, 52, 38, 26];
+
+let MAPA = null;
+function mapaKlic() { return ((mapaPot ? 'P+' : '') + mapaVyber.join('+')) + '|' + $('gsl_rok_slider').value + '|' + OKNO_POT + '|' + mapaVyber.map(trendMod).join(',') + '|' + maskaDekad().join(''); }
+function hodnotyBunky(b) {                          // [v1, v2?] pro mapu nebo null
+    const klic = MAPA.klic + '|' + b.tid + ':' + b.row + ':' + b.col;
+    if (memo.has(klic)) return memo.get(klic);
+    const w = MAPA.w, rok = MAPA.rok;
+    const Np = Math.floor(w / 2), Nm = Math.max.apply(null, mapaVyber.map(trendN).concat([mapaPot ? Np : 0]));
+    const y0 = Math.max(0, rok - Nm), y1 = Math.min(K.NY - 1, rok + Nm);
+    let out = null;
+    const tile = dlazdice.get(b.tid), k = tile ? indexVDlazdici(b) : -1;
+    if (tile && k >= 0 && k < tile.n && tile.sek.ls) {
+        const roc = K.rocni(tile, k, y0, y1);
+        const P = MAPA.fs.length ? K.dekodujRychle(tile, k, y0, y1, MAPA.fs) : null;
+        out = [];
+        if (mapaPot) { if (P) { const Ku = KA.klimaRoku(K, P, roc, b.jih, y0, y1); out.push(100 * KA.potencial(druhy, Ku, Math.max(0, rok - Np), Math.min(K.NY - 1, rok + Np)).podil); } else out.push(NaN); }
+        mapaVyber.forEach(id => out.push(KA.prumer(KA.okno(KA.ukazatelRychle(K, P, roc, b.jih, MAPA.maska, y0, y1, id), rok - trendN(id), rok + trendN(id)))));
+        if (out && out.some(v => v !== v)) out = null;
+    }
+    if (memo.size > 150000) memo.clear();
+    if (out !== null || (tile && k >= 0 && k < tile.n && tile.sek.ls)) memo.set(klic, out);   // nezapamatovat prázdný výsledek, když dlaždice ještě chybí
+    return out;
+}
+function barvaMapy(v) {
+    if (!v) return null;
+    const it = polozky(), tr = i => tridaHodnoty(v[i], MEZE[it[i]]);
+    if (v.length === 1) return RGB_ZELENE[tr(0)];
+    return hsl(HUE2[tr(0)], 74, SVETLOST2[tr(1)]);
+}
+function popisMeze(id, i) {
+  //  const m = MEZE[id], u = id === 'potencial' ? ' %' : '';
+    const m = MEZE[id], u = id === 'potencial' ? '' : '';
+    return i === 0 ? '< ' + m[0] + u : i === m.length ? '≥ ' + m[m.length - 1] + u : m[i - 1] + ' – ' + m[i] + u;
+}
+function legendaMapy() {
+    const p = $('mapa-legenda'), t = $('legenda-titulek'), b = $('legenda-barvy'), cp = $('gsl_casovy_panel'), it = polozky();
+    if (it.length) { p.style.display = 'block'; cp.style.display = 'block'; } else { p.style.display = 'none'; cp.style.display = 'none'; b.innerHTML = ''; return; }
+    // style="display:flex;align-items:center;gap:4px;"
+    const box = (c, tx) => `<center><i style="display:inline-block;width:18px;height:14px;background:${c};border:1px solid #999;"></i><br><span>${tx}</span></center>`;
+    const varov = it.indexOf('potencial') >= 0 ? `` : '';
+    //<div style="font-size:11px;color:#8a4b00;margin-top:4px;max-width:360px;"><b>Pozor u potenciálu:</b> ${POTENCIAL_KRATCE}</div>
+    const N = id => id === 'potencial' ? { nazev: 'Klimatický zemědělský potenciál', jedn: '% výživové hodnoty druhů, které prosperují' } : KA.PARAM[id];
+    if (it.length === 1) { const id = it[0]; t.textContent = 'Legenda: ' + N(id).nazev + ' (' + N(id).jedn + ')'; b.innerHTML = ZELENE.map((c, i) => box(c, popisMeze(id, i))).join('') + varov; return; }
+    const [a, c2] = it; t.textContent = `Legenda: odstín = ${N(a).nazev} (${N(a).jedn}), světlost = ${N(c2).nazev} (${N(c2).jedn})`;
+    let h = '<div style="display:grid;grid-template-columns:70px repeat(6,46px);gap:2px;align-items:center;font-size:11px;margin:auto;"><div></div>' +
+        HUE2.map((hh, i) => `<div style="text-align:center;">${popisMeze(a, i)}</div>`).join('');
+    for (let r = 0; r < 6; r++) {
+        h += `<div style="text-align:right;padding-right:4px;">${popisMeze(c2, r)}</div>`;
+        for (let i = 0; i < 6; i++) { const rgb = hsl(HUE2[i], 74, SVETLOST2[r]); h += `<div style="height:16px;background:rgb(${rgb[0]},${rgb[1]},${rgb[2]});"></div>`; }
+    }
+    b.innerHTML = h + '</div>' + varov;
+}
+let zpravaMapa = '';
+function obnovMapu() {
+    if (vrstva) { map.removeLayer(vrstva); vrstva = null; }
+    legendaMapy();
+    $('mapa-zprava').textContent = '';
+    if (!mapaPot && !mapaVyber.length) { if (lok && lokData && souradKliku) vykresliZnacku(lok); return; }
+    const mk = maskaDekad();
+    MAPA = { klic: mapaKlic(), w: OKNO_POT, rok: parseInt($('gsl_rok_slider').value, 10) - reg.rok_od, maska: mk,
+        fs: KA.featuryRychle(K, mapaVyber, mapaPot, mk), casti: ['rocni'] };
+    if (KA.potrebujeModel(K, mapaVyber, mapaPot, mk)) MAPA.casti.push('model');
+    if (KA.potrebujeTnn(mapaVyber, mapaPot)) MAPA.casti.push('tnn');
+    const KROK = 8, N = 34;
+    vrstva = L.gridLayer({ tileSize: 256, opacity: 0.6, keepBuffer: 2, updateWhenIdle: true, updateWhenZooming: false });
+    const male = document.createElement('canvas'); male.width = male.height = N; const mctx = male.getContext('2d');
+    vrstva.createTile = function (coords, done) {
+        const tile = L.DomUtil.create('canvas', 'leaflet-tile'); tile.width = tile.height = 256; const ctx = tile.getContext('2d');
+        const sv = 256 * Math.pow(2, coords.z), uzly = new Array(N * N), ids = new Set();
+        for (let j = 0; j < N; j++) {
+            const py = coords.y * 256 + (j - 1) * KROK + KROK / 2, lat = 180 / Math.PI * Math.atan(Math.sinh(Math.PI - 2 * Math.PI * py / sv));
+            for (let i = 0; i < N; i++) {
+                const px = coords.x * 256 + (i - 1) * KROK + KROK / 2, b = najdiBunku(lat, px / sv * 360 - 180);
+                uzly[j * N + i] = b; if (b) ids.add(b.tid);
+            }
+        }
+        if (ids.size > 40) { $('mapa-zprava').textContent = 'Mapa je příliš oddálená (data by se musela stáhnout pro celý svět). Přibližte mapu na jednu až dvě země.'; done(null, tile); return tile; }
+        pozadej(Array.from(ids), MAPA.casti).then(() => { const chybi = Array.from(ids).filter(id => dlazdice.get(id) === undefined); return chybi.length ? pozadej(chybi, MAPA.casti) : null; }).then(() => {
+            const img = mctx.createImageData(N, N), px = img.data, cache = new Map();
+            for (let k = 0; k < N * N; k++) {
+                const b = uzly[k]; if (!b) continue;
+                const kl = b.row * 4096 + b.col; let rgb = cache.get(kl);
+                if (rgb === undefined) { rgb = barvaMapy(hodnotyBunky(b)); cache.set(kl, rgb); }
+                if (!rgb) continue; const o = k * 4; px[o] = rgb[0]; px[o + 1] = rgb[1]; px[o + 2] = rgb[2]; px[o + 3] = 255;
+            }
+            mctx.putImageData(img, 0, 0); ctx.imageSmoothingEnabled = true; ctx.drawImage(male, 0, 0, N, N, -KROK, -KROK, N * KROK, N * KROK); done(null, tile);
+        }).catch(err => { $('mapa-zprava').textContent = 'Chyba načtení dat: ' + err.message; done(err, tile); });
+        return tile;
+    };
+    vrstva.addTo(map);
+    if (lok && lokData && souradKliku) vykresliZnacku(lok);
+}
+function posunulSeRokMapy() { $('gsl_rok_label').textContent = $('gsl_rok_slider').value; clearTimeout(casovacZmen); casovacZmen = setTimeout(() => obnovMapu(), 150); }
+
+let souradKliku = null;
+const mista = new Map();
+const souradLok = () => [lok.klikLat !== undefined ? lok.klikLat : lok.lat, lok.klikLon !== undefined ? lok.klikLon : lok.lon];
+async function nactiMisto(b) {                      // název místa z OpenStreetMap (Nominatim); bez připojení se prostě nezobrazí
+    const kl = b.klikLat.toFixed(3) + ':' + b.klikLon.toFixed(3);
+    if (!mista.has(kl)) {
+        try {
+            const j = await (await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&accept-language=cs&lat=' + b.klikLat + '&lon=' + b.klikLon)).json(), a = j.address || {};
+            mista.set(kl, [j.name || a.city || a.town || a.village || a.county || '', a.country || ''].filter(Boolean).join(', '));
+        } catch (e) { mista.set(kl, ''); }
+    }
+    b.misto = mista.get(kl); if (lok === b && lokData) obnovGraf();
+}
+function zrusZnacku() { if (znacka) { map.removeLayer(znacka); znacka = null; } }
+function radkyZnacky(b) {
+    if (!MAPA || (!mapaPot && !mapaVyber.length)) return [];
+    const v = hodnotyBunky(b); if (!v) return [];
+    return polozky().map((id, i) => id === 'potencial' ? 'Potenciál: ' + cislo(v[i], 1) + ' %' : KA.PARAM[id].nazev + ': ' + cislo(v[i], 1) + ' ' + KA.PARAM[id].jedn);
+}
+function vykresliZnacku(b) {                       // ohraničení buňky se zoomuje s mapou, kolečko a hodnoty mají pevnou velikost
+    zrusZnacku();
+    const m = reg.mrizka, hx = Math.abs(m.dx) / 2, hy = Math.abs(m.dy) / 2;
+    const ram = L.rectangle([[b.lat - hy, b.lon - hx], [b.lat + hy, b.lon + hx]], { color: '#e65100', weight: 3, fill: false, interactive: false });
+    const r = radkyZnacky(b), html = '<div class="zn-kolo"></div>' + (r.length ? '<div class="zn-text">' + r.map(esc).join('<br>') + '</div>' : '');
+    const ik = L.marker(souradKliku, { icon: L.divIcon({ className: 'zn-ikona', html, iconSize: [0, 0] }), interactive: false, keyboard: false });
+    znacka = L.layerGroup([ram, ik]).addTo(map);
+}
+map.on('click', e => zvolLokalitu(e.latlng.lat, e.latlng.lng));
+map.on('moveend', () => { if (!lok) nastavSezonyMapa(); });
+async function zvolLokalitu(lat, lon) {
+    const b = najdiBunku(lat, lon);
+    $('gps_vstup').value = lat.toFixed(4) + ', ' + lon.toFixed(4);
+    if (!b) { zrusZnacku(); nastavSezonyMapa(); lok = null; lokData = null; $('gsl-meta-info').textContent = 'V tomto bodě nejsou data (moře nebo oblast mimo databázi). Klikněte na pevninu.'; obnovGraf(); return; }
+    b.klikLat = lat; b.klikLon = lon; b.misto = ''; lok = b; nastavSezony(b.lat); nactiMisto(b);
+    zrusZnacku(); souradKliku = [lat, lon];
+    $('gsl-meta-info').textContent = 'Načítám data…';
+    try { await pozadej([b.tid], ['rocni', 'model', 'tnn']); } catch (err) { $('gsl-meta-info').textContent = 'Chyba načtení dat: ' + err.message; return; }
+    lokData = bunkaData(b); obnovGraf(); vykresliZnacku(b);
+}
+function zadanoGps() {
+    const m = $('gps_vstup').value.replace(',', ' ').trim().split(/\s+/).map(Number);
+    if (m.length >= 2 && isFinite(m[0]) && isFinite(m[1])) { map.setView([m[0], m[1]], Math.max(map.getZoom(), 6)); zvolLokalitu(m[0], m[1]); }
+}
+
+// ---------------------------------------------------------------------------------------------------
+// řady pro graf a výpis
+// ---------------------------------------------------------------------------------------------------
+function rozsahyParametru(id) { return (nast[id] && nast[id].zobrazRozsahy && nast[id].rozsahy) || []; }
+function seznamSerii() {
+    if (!lokData) return null;
+    const [y0, y1] = rozsahRoku(), maska = maskaDekad(), w = OKNO_POT;
+    const O = KA.rocniUkazatele(K, lokData.R, lokData.roc, lok.jih, maska);
+    const serie = [];
+    if (potencialVybran) {
+        const Ku = KA.klimaRoku(K, lokData.R, lokData.roc, lok.jih), h = Math.floor(w / 2), y = new Float32Array(K.NY).fill(NaN);
+        for (let i = 0; i < K.NY; i++) { const a = Math.max(0, i - h), b = Math.min(K.NY - 1, a + w - 1); y[i] = 100 * KA.potencial(druhy, Ku, a, b).podil; }
+        serie.push({ id: 'potencial', nazev: 'Klimatický zemědělský potenciál', jedn: '%', barva: '#2e7d32', y, presne: false, pocet: false });
+    }
+    vybrane.forEach(id => { const p = KA.PARAM[id]; serie.push({ id, nazev: p.nazev, jedn: p.jedn, barva: p.barva, y: O[id], presne: p.presne, pocet: p.agreg === 'soucet' && p.jedn === 'dny', riziko: p.riziko }); });
+    return { serie, y0, y1, O, maska, roky: rokyVybrane() };
+}
+function statistika(a) {
+    if (!a.length) return null;
+    return { prumer: KA.prumer(a), p10: KA.percentil(a, 10), p90: KA.percentil(a, 90), min: Math.min.apply(null, a), max: Math.max.apply(null, a) };
+}
+
+// ---------------------------------------------------------------------------------------------------
+// graf
+// ---------------------------------------------------------------------------------------------------
+function hezkeOsy(lo, hi) {
+    if (!(hi > lo)) { hi = lo + 1; }
+    const hrub = (hi - lo) / 5, mag = Math.pow(10, Math.floor(Math.log10(hrub))), n = hrub / mag, krok = (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+    const a = Math.floor(lo / krok) * krok, b = Math.ceil(hi / krok) * krok, t = []; for (let v = a; v <= b + krok / 2; v += krok) t.push(Math.round(v / krok) * krok);
+    return { lo: a, hi: b, ticks: t };
+}
+function seriePoDekadach(s, y0, y1) {                         // hodnoty po dekádách pro krátká období (≤ 5 let)
+    const NF = K.NF, IX = K.IX, out = [];
+    const mapuj = { tg: 'tg', tn: 'tn', tx: 'tx', tnn: 'tnn', txx: 'txx', fd: 'fd', tr: 'tr', rr1: 'rr1', r20: 'r20', su20: 'su20', su25: 'su25', su30: 'su30', su35: 'su35', sdii: 'sdii' };
+    for (let y = y0; y <= y1; y++) for (let d = 0; d < 36; d++) {
+        const o = (y * 36 + d) * NF; let v;
+        if (mapuj[s.id]) v = lokData.R[o + IX[mapuj[s.id]]];
+        else if (s.id === 'srazky') v = lokData.R[o + IX.rr1] * lokData.R[o + IX.sdii];
+        else v = s.y[y];
+        out.push(v);
+    }
+    return out;
+}
+function zobrazMod(id) { return (nast[id] && nast[id].zobrazeni) || (KA.PARAM[id] && KA.PARAM[id].skupina === 'dny' ? 'sloupce' : 'krivka'); }
+function trendMod(id) { return (nast[id] && nast[id].trend) || 'zadny'; }
+function trendN(id) { const t = trendMod(id); return t === 'rok' ? 1 : /^\d+$/.test(t) ? parseInt(t, 10) : 0; }
+function oknoPrumer(a, i, N) { let s = 0, n = 0; for (let k = i - N; k <= i + N; k++) { const v = a[k]; if (v !== undefined && v === v) { s += v; n++; } } return n ? s / n : NaN; }
+const DEK_PARAMETRY = ['tg', 'tn', 'tx', 'tnn', 'txx', 'fd', 'tr', 'rr1', 'r20', 'su20', 'su25', 'su30', 'su35', 'sdii', 'srazky'];
+function vypocitejTrend(s, S, kratke) {            // hodnoty trendu zarovnané s s.v; průměr jen z existujících hodnot
+    const tm = trendMod(s.id), N = trendN(s.id), maDek = DEK_PARAMETRY.indexOf(s.id) >= 0;
+    if (kratke || (tm === 'dek' && maDek)) {
+        const D = Array.from(seriePoDekadach(s, 0, K.NY - 1));
+        const kroky = tm === 'dek' ? [-1, 0, 1] : Array.from({ length: 2 * N + 1 }, (_, k) => (k - N) * 36);
+        const sm = i => { let a = 0, n = 0; kroky.forEach(d => { const v = D[i + d]; if (v !== undefined && v === v) { a += v; n++; } }); return n ? a / n : NaN; };
+        if (kratke) return s.v.map((_, j) => sm(S.poz[j]));
+        const D3 = D.map((_, i) => sm(i)), ag = KA.PARAM[s.id].agreg, out = [];
+        for (const y of S.roky) {
+            let a = 0, n = 0, mn = Infinity, mx = -Infinity;
+            for (let d = 0; d < 36; d++) { if (!S.maska[d]) continue; const v = D3[y * 36 + d]; if (v !== v) continue; a += v; n++; mn = Math.min(mn, v); mx = Math.max(mx, v); }
+            out.push(!n ? NaN : ag === 'soucet' ? a : ag === 'min' ? mn : ag === 'max' ? mx : a / n);
+        }
+        return out;
+    }
+    const Y = Array.from(s.y), NN = tm === 'dek' ? 1 : N;
+    return S.roky.map(y => oknoPrumer(Y, y, NN));
+}
+function cestaOblouk(ctx, pts, sirka) {            // lomená čára trendu zaoblená v každém vrcholu; null přeruší křivku
+    ctx.lineWidth = sirka; let seg = [];
+    const stred = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    const dokonci = () => {
+        const n = seg.length;
+        if (n > 1) {
+            ctx.beginPath(); ctx.moveTo(seg[0].x, seg[0].y);
+            if (n === 2) ctx.lineTo(seg[1].x, seg[1].y);
+            else {
+                const m0 = stred(seg[0], seg[1]); ctx.lineTo(m0.x, m0.y);
+                for (let i = 1; i < n - 1; i++) { const m = stred(seg[i], seg[i + 1]); ctx.quadraticCurveTo(seg[i].x, seg[i].y, m.x, m.y); }
+                ctx.lineTo(seg[n - 1].x, seg[n - 1].y);
+            }
+            ctx.stroke();
+        }
+        seg = [];
+    };
+    pts.forEach(p => { if (p === null) dokonci(); else seg.push(p); }); dokonci();
+}
+function obnovGraf() {
+    const cv = $('gslGraf'), info = $('gsl-meta-info');
+    if (!(vybrane.length || potencialVybran)) { cv.style.display = 'none'; return; }
+    if (!lokData) { cv.style.display = 'none'; if (!lok) info.textContent = 'Kliknutím do mapy zobrazíte graf vývoje na daných souřadnicích nebo je výše napište.'; return; }
+    const S = seznamSerii(), ctx = cv.getContext('2d'); if (!S) return;
+    const kratke = S.roky.length <= 10;
+    cv.style.display = 'block';
+    const W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+    S.poz = kratke ? [].concat.apply([], S.roky.map(y => { const a = []; for (let d = 0; d < 36; d++) if (S.maska[d]) a.push(y * 36 + d); return a; })) : S.roky.slice();   // zobrazené pozice (dekáda = rok*36+d, jinak rok)
+    const nx = S.poz.length;
+    const serie = S.serie.map(s => Object.assign({}, s, { v: kratke ? (() => { const D = seriePoDekadach(s, 0, K.NY - 1); return S.poz.map(p => D[p]); })() : S.poz.map(y => s.y[y]) }));
+    const stoh = serie.filter(s => KA.PARAM[s.id] && KA.PARAM[s.id].skupina === 'dny' && zobrazMod(s.id) === 'sloupce'), pruh = [], cary = serie.filter(s => stoh.indexOf(s) < 0 || trendMod(s.id) !== 'zadny');
+    const RETEZY = [['su20', 'su25', 'su30', 'su35'], ['rr1', 'r20']], PRAH = { su20: 20, su25: 25, su30: 30, su35: 35 };
+    stoh.forEach(s => {                              // dny nad vyšším prahem se už počítají v nižším: sloupec ukazuje jen pásmo
+        s.vs = s.v.slice(); const ch = RETEZY.find(c => c.indexOf(s.id) >= 0);
+        const dalsi = ch ? ch.slice(ch.indexOf(s.id) + 1).map(id => stoh.find(q => q.id === id)).find(Boolean) : null;
+        if (dalsi) { s.vs = s.v.map((v, i) => Math.max(0, v - dalsi.v[i])); s.nazev = PRAH[s.id] ? 'Dny ' + PRAH[s.id] + '–' + PRAH[dalsi.id] + ' °C' : s.nazev + ' (do 20 mm)'; }
+        else if (ch && PRAH[s.id]) s.nazev = 'Dny nad ' + PRAH[s.id] + ' °C';
+    });
+    const soucetSloupce = Array.from({ length: nx }, (_, i) => stoh.reduce((a, s) => a + (s.vs[i] > 0 ? s.vs[i] : 0), 0)), maxSoucet = soucetSloupce.length ? Math.max.apply(null, soucetSloupce) : 0;
+    const jedn = []; cary.forEach(s => { if (jedn.indexOf(s.jedn) < 0) jedn.push(s.jedn); }); if (stoh.length && jedn.indexOf('dny') < 0) jedn.push('dny');
+    const nPrav = Math.max(0, jedn.length - 1), L0 = 78, R0 = W - 24 - nPrav * 78, tierH = 36, dolni = pruh.length * tierH;
+    const top = 70, bot = H - 100 - dolni;
+    const X = i => L0 + (nx > 1 ? i / (nx - 1) : 0.5) * (R0 - L0);
+    const osy = {};
+    jedn.forEach((u, i) => {
+        let lo = Infinity, hi = -Infinity;
+        cary.filter(s => s.jedn === u).forEach(s => {
+            s.v.forEach(v => { if (v === v) { lo = Math.min(lo, v); hi = Math.max(hi, v); } });
+            rozsahyParametru(s.id).forEach(r => { lo = Math.min(lo, r.od); hi = Math.max(hi, r.do); });
+        });
+        if (u === 'dny' && stoh.length) { hi = Math.max(hi, maxSoucet); lo = Math.min(lo, 0); }
+        if (u === '%') { lo = 0; hi = 100; } else if (u === 'dny' || u === 'mm') lo = Math.min(lo, 0);
+        if (!isFinite(lo)) { lo = 0; hi = 1; }
+        const ax = hezkeOsy(lo, hi); ax.i = i; ax.y = v => bot - (v - ax.lo) / (ax.hi - ax.lo) * (bot - top); osy[u] = ax;
+    });
+    // pásy rozsahů
+    serie.forEach(s => rozsahyParametru(s.id).forEach(r => {
+        const ax = osy[s.jedn]; ctx.fillStyle = s.barva + '26'; const ya = ax.y(Math.min(ax.hi, r.do)), yb = ax.y(Math.max(ax.lo, r.od));
+        ctx.fillRect(L0, ya, R0 - L0, yb - ya);
+    }));
+    // mřížka a osy
+    ctx.font = '16px sans-serif'; ctx.lineWidth = 1;
+    const ax0 = osy[jedn[0]];
+    if (ax0) ax0.ticks.forEach(t => { const y = ax0.y(t); ctx.strokeStyle = '#e3e3e3'; ctx.beginPath(); ctx.moveTo(L0, y); ctx.lineTo(R0, y); ctx.stroke(); });
+    jedn.forEach((u, i) => {
+        const ax = osy[u], x = i === 0 ? L0 : R0 + (i - 1) * 78, sr = cary.filter(s => s.jedn === u), barva = sr.length === 1 ? sr[0].barva : '#333';
+        ctx.strokeStyle = barva; ctx.fillStyle = barva; ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bot); ctx.stroke();
+        ctx.textAlign = i === 0 ? 'right' : 'left';
+        ax.ticks.forEach(t => { const y = ax.y(t); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (i === 0 ? -6 : 6), y); ctx.stroke(); ctx.fillText(String(Math.round(t * 100) / 100).replace('.', ','), x + (i === 0 ? -9 : 9), y + 7); });
+        ctx.save(); ctx.translate(x + (i === 0 ? -64 : 64), (top + bot) / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText(u, 0, 0); ctx.restore();
+    });
+    // osa x
+    ctx.fillStyle = '#333'; ctx.strokeStyle = '#999'; ctx.textAlign = 'center'; ctx.beginPath(); ctx.moveTo(L0, bot); ctx.lineTo(R0, bot); ctx.stroke();
+    const poz = S.poz, rokDek = p => Math.floor(p / 36), rokOd = p => reg.rok_od + (kratke ? rokDek(p) : p), sir = nx > 1 ? (R0 - L0) / (nx - 1) : (R0 - L0);
+    const kroky = kratke ? [1, 2, 3, 4, 6, 9, 12, 18, 36] : [1, 2, 5, 10, 20, 50];
+    let krok = kroky[kroky.length - 1]; for (const k of kroky) if (sir * k >= (kratke ? 24 : 36)) { krok = k; break; }
+    const kratkyRok = !kratke && sir * krok < 38, y1 = bot + dolni + 22, y2 = bot + dolni + 38, y3 = bot + dolni + 54, y4 = bot + dolni + 70;
+    const spojPred = i => i > 0 && poz[i] !== poz[i - 1] + 1, spojPo = i => i < nx - 1 && poz[i + 1] !== poz[i] + 1;
+    const rokSpoj = i => spojPred(i) && (kratke ? rokDek(poz[i]) - rokDek(poz[i - 1]) > 1 : true);
+    ctx.textAlign = 'center'; ctx.font = '15px sans-serif';
+    for (let i = 0; i < nx; i++) {
+        const d = kratke ? poz[i] % 36 : 0, rokI = rokOd(poz[i]), x = X(i);
+        const novyRok = kratke && (i === 0 || rokDek(poz[i]) !== rokDek(poz[i - 1])), desetiletiRoku = !kratke && rokI % 10 === 0;
+        ctx.strokeStyle = kratke && d === 0 ? '#666' : desetiletiRoku ? '#a9a9a9' : '#e6e6e6'; ctx.lineWidth = kratke && d === 0 ? 2.2 : desetiletiRoku ? 1.8 : 1;
+        ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bot); ctx.stroke();
+        const lab = (kratke ? d % krok === 0 : rokI % krok === 0) && !spojPred(i) && !spojPo(i);
+        ctx.strokeStyle = '#999'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, bot); ctx.lineTo(x, bot + (lab ? 8 : 4)); ctx.stroke();
+        ctx.fillStyle = '#333';
+        if (lab) ctx.fillText(kratke ? String(d + 1) : (kratkyRok ? String(rokI).slice(-2) : String(rokI)), x, y1);
+        if (kratke) { if (novyRok && !rokSpoj(i)) ctx.fillText(String(rokI), x, y3); }
+        else if (kratkyRok && lab && desetiletiRoku) ctx.fillText(String(rokI), x, y2);
+        if (spojPred(i)) {                     // předěl vybraných částí: silná čára, konec předchozí a začátek další části pod sebou
+            const xb = (X(i - 1) + x) / 2, rs = rokSpoj(i);
+            ctx.strokeStyle = rs ? '#000' : '#333'; ctx.lineWidth = rs ? 4 : 2.6;
+            ctx.beginPath(); ctx.moveTo(xb, top); ctx.lineTo(xb, bot + 8); ctx.stroke();
+            ctx.fillStyle = '#000'; ctx.font = 'bold 14px sans-serif';
+            if (kratke) { ctx.fillText(String(poz[i - 1] % 36 + 1), xb, y1); ctx.fillText(String(d + 1), xb, y2); if (rs) { ctx.fillText(String(rokOd(poz[i - 1])), xb, y3); ctx.fillText(String(rokI), xb, y4); } }
+            else { ctx.fillText(String(rokOd(poz[i - 1])), xb, y1); ctx.fillText(String(rokI), xb, y2); }
+            ctx.font = '15px sans-serif'; ctx.fillStyle = '#333';
+        }
+    }
+    // skládané sloupce (světlejší barvy, pořadí zdola podle katalogu parametrů)
+    if (stoh.length) {
+        const axD = osy['dny'], poradi = stoh.slice().sort((a, b) => KA.PARAMETRY.indexOf(KA.PARAM[a.id]) - KA.PARAMETRY.indexOf(KA.PARAM[b.id])), bw = Math.max(1, sir * 0.8);
+        for (let i = 0; i < nx; i++) { let cum = 0; poradi.forEach(s => { const v = s.vs[i]; if (v > 0) { ctx.fillStyle = s.barva + 'b8'; const ya = axD.y(cum + v), yb = axD.y(cum); ctx.fillRect(X(i) - bw / 2, ya, bw, yb - ya); ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 0.8; ctx.strokeRect(X(i) - bw / 2, ya, bw, yb - ya); cum += v; } }); }
+    }
+    // čáry
+    cary.forEach(s => {
+        const ax = osy[s.jedn]; ctx.strokeStyle = s.barva; ctx.fillStyle = s.barva;
+        const cesta = (arr, sirka, alfa) => { ctx.globalAlpha = alfa; ctx.lineWidth = sirka; ctx.beginPath(); let p = false; arr.forEach((v, i) => { if (v !== v) { p = false; return; } if (i > 0 && S.poz[i] !== S.poz[i - 1] + 1) p = false; const x = X(i), y = ax.y(v); if (!p) { ctx.moveTo(x, y); p = true; } else ctx.lineTo(x, y); }); ctx.stroke(); ctx.globalAlpha = 1; };
+        const tl = s.presne ? 3.2 : 2.2;
+        if (trendMod(s.id) === 'zadny') cesta(s.v, tl, 1);
+        else {
+            cesta(s.v, 1.2, 0.55);
+            const tv = vypocitejTrend(s, S, kratke);
+            const pts = []; tv.forEach((v, i) => { if (i > 0 && S.poz[i] !== S.poz[i - 1] + 1) pts.push(null); pts.push(v === v ? { x: X(i), y: ax.y(v) } : null); });
+            cestaOblouk(ctx, pts, 4);
+        }
+    });
+    // pruhy počtů po patrech (krátké období)
+    pruh.forEach((s, ti) => {
+        const yt = bot + 8 + ti * tierH, mx = Math.max(1, Math.max.apply(null, s.v.filter(v => v === v))), sirka = Math.max(1, (R0 - L0) / nx - 0.5);
+        ctx.fillStyle = s.barva; s.v.forEach((v, i) => { if (v > 0) { const h = v / mx * (tierH - 6); ctx.fillRect(X(i) - sirka / 2, yt + tierH - 6 - h, sirka, h); } });
+        ctx.fillStyle = '#555'; ctx.font = '13px sans-serif'; ctx.textAlign = 'right'; ctx.fillText('max ' + cislo(mx, 0), L0 - 6, yt + 16); ctx.font = '16px sans-serif';
+    });
+    // legenda
+    let lx = L0, ly = 24; ctx.textAlign = 'left'; ctx.font = '15px sans-serif';
+    serie.forEach(s => {
+        const txt = s.nazev + (s.presne ? '' : ' ≈') + (s.trendTxt ? ' (' + s.trendTxt + ')' : ''), w = ctx.measureText(txt).width + 54;
+        if (lx + w > W - 10) { lx = L0; ly += 26; }
+        ctx.fillStyle = s.barva; if (stoh.indexOf(s) >= 0 && trendMod(s.id) === 'zadny') ctx.fillRect(lx, ly - 12, 28, 14); else { ctx.strokeStyle = s.barva; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(lx, ly - 4); ctx.lineTo(lx + 28, ly - 4); ctx.stroke(); }
+        ctx.fillStyle = '#222'; ctx.fillText(txt, lx + 34, ly + 2); lx += w + 12;
+    });
+    ctx.font = '13px sans-serif'; ctx.fillStyle = '#666'; ctx.textAlign = 'right';
+    ctx.fillText((lok.misto ? lok.misto + ' · ' : '') + cislo(souradLok()[0], 4) + ' °, ' + cislo(souradLok()[1], 4) + ' ° · ' + (reg.model || 'Copernicus C3S, agroklimatické indikátory'), W - 10, H - 8);
+    if (potencialVybran) { ctx.textAlign = 'left'; ctx.fillStyle = '#8a4b00'; ctx.fillText('Potenciál nezahrnuje evapotranspiraci, půdu ani vodní bilanci a může se jimi zásadně změnit; je orientační.', L0, H - 8); }
+    const kli = 'Kliknutím na graf ho zvětšíte a potom obráceně.';
+    const loka = ' Lokalita: ' + cislo(souradLok()[0], 4) + ' °, ' + cislo(souradLok()[1], 4) + ' ° (místo kliknutí; hodnoty platí pro celou buňku 0,5° × 0,5°).';
+    const pri = ' Přibližné hodnoty jsou označeny ≈.';
+    info.innerHTML = kli + "<br>" + pri; //+ loka + "<br>"
+    $('tlacitko-vypis').style.display = 'block';
+}
+
+// ---------------------------------------------------------------------------------------------------
+// výpis a export
+// ---------------------------------------------------------------------------------------------------
+let VYPIS = null;
+function sestavVypisData() {
+    const S = seznamSerii(); if (!S) return null;
+    const roky = S.roky.map(y => reg.rok_od + y);
+    const sloupce = S.serie.map(s => {
+        const a = S.roky.map(y => s.y[y]), plati = a.filter(v => v === v), st = statistika(plati), tr = KA.trend(a), roz = rozsahyParametru(s.id);
+        const mezI = (nast[s.id] && nast[s.id].mez !== undefined) ? nast[s.id].mez : MEZ_RIZIKA[s.id];
+        return { s, a, st, tr, podilRozsah: roz.length ? plati.filter(v => roz.some(r => v >= r.od && v <= r.do)).length / plati.length : null,
+            riziko: (s.riziko && mezI !== undefined && nast[s.id] && nast[s.id].zobrazMez) ? KA.riziko(plati, mezI, s.riziko) : null, mez: mezI };
+    });
+    return { roky, sloupce, S };
+}
+function nadpisLokality() { return 'Lokalita ' + (lok.misto ? lok.misto + ', ' : '') + cislo(souradLok()[0], 4) + ' °, ' + cislo(souradLok()[1], 4) + ' ° · ' + (reg.model || 'Copernicus C3S'); }
+const POUZITI = {
+    tnn: 'Určuje zimovzdornost: nejnižší teplota pod odolností druhu (USDA zóna, letální teplota) znamená riziko vymrznutí.',
+    tn: 'Noční chlad: nízké hodnoty zvyšují riziko pozdních mrazíků, vysoké podporují teplomilné druhy.',
+    tg: 'Celkové tepelné klima; rozhoduje o výběru druhů a odrůd (chladnomilné pod asi 10 °C, teplomilné nad asi 15 °C).',
+    tx: 'Denní maxima: vysoké hodnoty zvyšují výpar a stres z horka, nízké zpomalují dozrávání.',
+    txx: 'Nejvyšší teplota roku: nad asi 38 °C hrozí spálení listů a plodů; počítejte se stíněním a mulčem.',
+    fd: 'Mrazové dny: více dnů zkracuje sezónu a ohrožuje květy; užitečné pro druhy, které potřebují chlad (např. jabloně).',
+    su20: 'Dny nad 20 °C: orientace pro růst teplomilnějších plodin; více dnů = delší období příznivého růstu.',
+    su25: 'Letní dny: důležité pro dozrávání rajčat, papriky, vinné révy; při nedostatku volte raně zrající odrůdy.',
+    su30: 'Horké dny: nad 30 °C se u chladnomilných druhů zastavuje růst; plánujte závlahu a stínění.',
+    su35: 'Velmi horké dny: ohrožují úrodu i zvířata; důležité pro výběr odolných druhů a stínění.',
+    tr: 'Noci nad 20 °C: zhoršují zrání ovoce a odpočinek rostlin; sledujte v teplejších oblastech.',
+    rr1: 'Deštivé dny: četnost srážek ovlivňuje chorobnost (plísně) a možnost práce na poli.',
+    r20: 'Dny se silným deštěm: riziko eroze a zaplavení; plánujte mulč, vsakování a protierozní pásy.',
+    bezmrazi: 'Délka bezmrazového období: rozhoduje o jednoletých plodinách (jejich cyklus musí být kratší) a o termínu výsadby.',
+    vegSezona: 'Doba růstu (průměrná teplota od 5 °C): kolik dní mohou rostliny růst; ovlivňuje počet sklizní a pastvu.',
+    jarniMraz: 'Číslo dekády posledního jarního mrazu: určuje nejdřívější bezpečný výsev a výsadbu.',
+    podzimniMraz: 'Číslo dekády prvního podzimního mrazu: do tohoto termínu je potřeba sklidit citlivé plodiny.',
+    sdii: 'Intenzita srážek v deštivých dnech: vysoké hodnoty = přívalový déšť a eroze; navrhněte vsakovací opatření.',
+    srazky: 'Odhad ročního úhrnu: porovnejte s potřebou druhů; při nedostatku plánujte závlahu a zadržování vody v krajině.',
+    potencial: 'Vážený průměr způsobilosti druhů podle výživové hodnoty; orientační odhad, ne předpověď úrody. Nezahrnuje evapotranspiraci, půdu ani vodní bilanci.'
+};
+let VYPIS_ZAL = 'hodnoty', VYPIS_VSE = false, VYPIS_B = [], bublExport = null;
+const fmtV = (v, d) => (v === null || v === undefined || v !== v) ? '' : cislo(v, d === undefined ? 1 : d);
+function bloky(D) {                                  // tabulky výpisu: {k, nazev, popis, hlav, radky, smart, levy, extra}
+    const S = D.S, B = [], jm = c => c.s.nazev + (c.s.presne ? '' : ' ≈') + ' [' + c.s.jedn + ']';
+    const dek = maskaDekad().reduce((a, b) => a + b, 0), obdobi = `Období ${D.roky[0]}–${D.roky[D.roky.length - 1]}, vybráno ${S.roky.length} roků a ${dek} z 36 dekád v roce.` + (potencialVybran ? ' <b>Pozor u potenciálu:</b> ' + POTENCIAL_POZN : '');
+    if (D.roky.length <= 100) B.push({ k: 'hodnoty', nazev: 'Hodnoty po letech', smart: true, levy: [], popis: obdobi + ' Hodnoty označené ≈ jsou přibližné (z dekádního odhadu), ostatní roční hodnoty jsou v databázi přesné.',
+        hlav: ['Rok'].concat(D.sloupce.map(jm)), radky: D.roky.map((r, i) => [String(r)].concat(D.sloupce.map(c => fmtV(c.a[i], 1)))) });
+    const R = (nm, f) => [nm].concat(D.sloupce.map(f));
+    B.push({ k: 'stat', nazev: 'Statistiky', smart: false, levy: [0], popis: obdobi, hlav: ['Ukazatel'].concat(D.sloupce.map(jm)), radky: [
+        R('Průměr', c => fmtV(c.st && c.st.prumer)), R('10. percentil', c => fmtV(c.st && c.st.p10)), R('90. percentil', c => fmtV(c.st && c.st.p90)),
+        R('Minimum', c => fmtV(c.st && c.st.min)), R('Maximum', c => fmtV(c.st && c.st.max)), R('Trend na 10 let', c => fmtV(c.tr.sklon10, 2)),
+        R('Podíl let v zadaných rozsazích', c => c.podilRozsah === null ? '–' : cislo(100 * c.podilRozsah, 0) + ' %'),
+        R('Riziko (podíl let pod/nad mezí)', c => c.riziko === null ? '–' : cislo(100 * c.riziko, 0) + ' % (' + (c.s.riziko === 'pod' ? '< ' : '> ') + c.mez + ')')] });
+    const ids = VYPIS_VSE ? KA.PARAMETRY.map(p => p.id) : D.sloupce.filter(c => c.s.id !== 'potencial').map(c => c.s.id);
+    const rad = ids.map(id => { const p = KA.PARAM[id], a = S.roky.map(y => S.O[id][y]), st = statistika(a.filter(v => v === v)), tr = KA.trend(a);
+        return [p.nazev, p.jedn, fmtV(st && st.prumer), fmtV(st && st.min), fmtV(st && st.max), fmtV(tr.sklon10, 2), POUZITI[id] || '']; });
+    const pc = D.sloupce.find(c => c.s.id === 'potencial');
+    if (pc) rad.unshift(['Klimatický zemědělský potenciál', '%', fmtV(pc.st && pc.st.prumer), fmtV(pc.st && pc.st.min), fmtV(pc.st && pc.st.max), fmtV(pc.tr.sklon10, 2), POUZITI.potencial]);
+    B.push({ k: 'pouziti', nazev: 'Použití a návod', smart: true, levy: [0, 1, 6], hlav: ['Parametr', 'Jednotka', 'Průměr', 'Minimum', 'Maximum', 'Trend na 10 let', 'K čemu to slouží'], radky: rad,
+        popis: obdobi + ' <b>Návod:</b> 1) u každého parametru porovnejte průměr i krajní hodnoty s nároky své plodiny nebo záměru (rozsahy a mez rizika nastavíte klíčem u parametru); 2) trend na 10 let ukazuje, kam se klima posouvá; 3) při plánování počítejte spíš s nejnepříznivější než s průměrnou hodnotou.',
+        extra: `<label style="font-size:13px;">Zobrazit: <select onchange="VYPIS_VSE = this.value === 'vse'; otevriVypis('pouziti');" style="width:auto;display:inline-block;"><option value="vyb"${VYPIS_VSE ? '' : ' selected'}>vybrané parametry</option><option value="vse"${VYPIS_VSE ? ' selected' : ''}>všechny parametry</option></select></label>` });
+    if (potencialVybran && druhy) {
+        const Ku = KA.klimaRoku(K, lokData.R, lokData.roc, lok.jih), P = KA.potencial(druhy, Ku, S.y0, S.y1, { detail: true });
+        const rr = P.proDruh.slice().sort((a, b) => b.s - a.s);
+        B.push({ k: 'plodiny', nazev: 'Plodiny v potenciálu', smart: true, levy: [0, 2], hlav: ['Druh', 'Způsobilost [%]', 'Prosperuje'], radky: rr.map(x => [x.cesky || x.klic, fmtV(100 * x.s, 0), x.s >= 0.5 ? 'ano' : 'ne']),
+            popis: `Do výpočtu vstoupilo ${P.n} druhů (váha = výživová hodnota). Potenciál (vážený průměr způsobilosti) je ${cislo(100 * P.podil, 1)} %, podíl výživové hodnoty druhů nad prahem 50 % je ${cislo(100 * P.tvrdy, 1)} %. Způsobilost 100 % = všechna kritéria splněna; pod 50 % druh podle odhadu neprosperuje. <b>Pozor:</b> ${POTENCIAL_POZN}` });
+    }
+    return B;
+}
+function searchHtml(id) { return `<div id="${id}" class="search-container"><div class="input-wrapper"><input type="text" class="search-input" placeholder="Hledat…"><button type="button" class="clear-btn">×</button><ul class="autocomplete-list"></ul></div><select class="search-field"><option value="all">Všechny sloupce</option></select></div>`; }
+function vykresliBlok(b, smart) {
+    const st = i => (b.levy || [0]).indexOf(i) >= 0 ? ' style="text-align:left;"' : '';
+    let h = `<div class="popis">${b.popis}</div>` + (smart && b.extra ? b.extra : '') + (smart && b.smart ? searchHtml('vs_' + b.k) : '');
+    return h + `<table class="vypis" id="vt_${b.k}"><thead><tr>${b.hlav.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>` +
+        b.radky.map(r => '<tr>' + r.map((x, i) => `<td${st(i)}>${esc(x)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
+}
+function sestavVypis(D, zalozka) {
+    const B = bloky(D); VYPIS_B = B; zalozka = B.some(b => b.k === zalozka) ? zalozka : B[0].k; VYPIS_ZAL = zalozka;
+    let h = '<div class="vt-tabs">' + B.map(b => `<button type="button" class="vt-tab${b.k === zalozka ? ' act' : ''}" data-k="${b.k}" onclick="vtZalozka('${b.k}')">${esc(b.nazev)}</button>`).join('') + '</div>';
+    B.forEach(b => { h += `<div class="vt-pane" id="vp_${b.k}" style="display:${b.k === zalozka ? 'block' : 'none'};">${vykresliBlok(b, true)}</div>`; });
+    return h;
+}
+function vtZalozka(k) {
+    VYPIS_ZAL = k;
+    document.querySelectorAll('.vt-pane').forEach(p => { p.style.display = p.id === 'vp_' + k ? 'block' : 'none'; });
+    document.querySelectorAll('.vt-tab').forEach(t => t.classList.toggle('act', t.dataset.k === k));
+}
+function otevriVypis(zalozka) {
+    const D = sestavVypisData(); if (!D) return; VYPIS = D;
+    const tabu = $('tabulka');
+    const tl = (barva, txt, fn) => `<button class="resizer3" style="height:auto;min-height:30px;margin:0;cursor:pointer;color:#454545;opacity:0.9;padding:5px 10px;border-radius:5px;width:auto;background:${barva};position:relative;" onclick="${fn}">${txt}</button>`;
+    tabu.innerHTML = `<div style="position:absolute;display:flex;right:0;top:0;z-index:1010;width:auto;min-height:30px;box-sizing:border-box;margin:5px;gap:10px;">` +
+        tl('hsl(60, 100%, 90%)', 'Exportovat výpis do .html', 'exportujVypisHtml()') + tl('hsl(100, 100%, 90%)', 'Exportovat data do .csv', 'otevriExport(this)') + tl('hsl(0, 100%, 90%)', 'Zavři výpis', 'zavriVypis()') + `</div>` +
+        `<div style="width:100%;height:100%;overflow:auto;box-sizing:border-box;padding:10px 15px 15px 15px;border-radius:7px;background:linear-gradient(0deg, rgb(172,172,172) 0%, rgb(252,252,253) 0.5%, rgb(249,250,250) 99%, rgb(234,234,234) 100%);color:hsl(0,0%,12%);font-size:15px;line-height:1.3;">` +
+        `<h4 style="margin:10px;text-align:center;">${esc(nadpisLokality())}</h4>` + sestavVypis(D, zalozka || VYPIS_ZAL) + '<br></div>';
+    tabu.style.display = 'block'; setTimeout(() => { tabu.style.opacity = '1'; }, 10);
+    VYPIS_B.forEach(b => { if (b.smart && $('vt_' + b.k)) new SmartTable('vs_' + b.k, 'vt_' + b.k); });
+}
+function otevriExport(btn) {                         // bublina se dvěma možnostmi exportu do .csv
+    if (!bublExport) {
+        bublExport = new Bublina(btn, vytvorOknoBubliny('bubl-export', 300), {});
+        bublExport.okno.querySelector('.napoveda-obsah').innerHTML = '<div style="padding:12px 12px;padding-top:35px;display:flex;flex-direction:column;gap:12px;">' +
+            '<button type="button" class="resizer3 tl-mal " style="margin:0;background: hsl(100, 100%, 90%);" onclick="bublExport.zavri(); exportujVypisCsv();">Obsah výpisu: vybrané parametry po letech a statistiky</button>' +
+            '<button type="button" class="resizer3 tl-mal " style="margin:0;background: hsl(100, 100%, 90%);" onclick="bublExport.zavri(); exportujVseCsv();">Všechny hodnoty z databáze pro tyto souřadnice (po dekádách)</button></div>';
+    }
+    bublExport.tl = btn; bublExport.prepni();
+}
+function exportujVseCsv() {
+    if (!lokData || !lok) return;
+    const R = lokData.R, NF = K.NF, jm = Object.keys(K.IX).sort((a, b) => K.IX[a] - K.IX[b]);
+    const c = v => (v === null || v === undefined || v !== v) ? '' : String(Math.round(v * 1000) / 1000).replace('.', ',');
+    const t = ['rok;dekada;' + jm.join(';')];
+    for (let y = 0; y < K.NY; y++) for (let d = 0; d < 36; d++) { const o = (y * 36 + d) * NF, r = [reg.rok_od + y, d + 1]; jm.forEach(f => r.push(c(R[o + K.IX[f]]))); t.push(r.join(';')); }
+    stahni(nazevSouboru('csv').replace('agroklima_', 'agroklima_vse_'), '\ufeff' + t.join('\n'), 'text/csv;charset=utf-8');
+}
+function zavriVypis() { if (bublExport) bublExport.zavri(); const t = $('tabulka'); t.style.opacity = '0'; setTimeout(() => { t.style.display = 'none'; }, 500); }
+function stahni(nazev, obsah, typ) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([obsah], { type: typ })); a.download = nazev;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+const nazevSouboru = ext => 'agroklima_' + souradLok()[0].toFixed(4) + '_' + souradLok()[1].toFixed(4) + '.' + ext;
+function exportujVypisCsv() {
+    const D = VYPIS; if (!D) return; const q = v => '"' + String(v).replace(/"/g, '""') + '"', c = v => (v === null || v === undefined || v !== v) ? '' : String(Math.round(v * 1000) / 1000).replace('.', ',');
+    let t = [q('Rok')].concat(D.sloupce.map(x => q(x.s.nazev + (x.s.presne ? '' : ' ≈') + ' [' + x.s.jedn + ']'))).join(';') + '\n';
+    D.roky.forEach((r, i) => { t += [r].concat(D.sloupce.map(x => c(x.a[i]))).join(';') + '\n'; });
+    const st = (nm, f) => { t += [q(nm)].concat(D.sloupce.map(x => c(f(x)))).join(';') + '\n'; };
+    st('Průměr', x => x.st && x.st.prumer); st('10. percentil', x => x.st && x.st.p10); st('90. percentil', x => x.st && x.st.p90);
+    st('Minimum', x => x.st && x.st.min); st('Maximum', x => x.st && x.st.max); st('Trend na 10 let', x => x.tr.sklon10);
+    st('Podíl let v rozsazích (%)', x => x.podilRozsah === null ? null : 100 * x.podilRozsah); st('Riziko (%)', x => x.riziko === null ? null : 100 * x.riziko);
+    stahni(nazevSouboru('csv'), '\ufeff' + t, 'text/csv;charset=utf-8');
+}
+function exportujVypisHtml() {
+    const D = VYPIS; if (!D) return;
+    const css = 'body{font-family:sans-serif;margin:20px}table{border-collapse:collapse;font-size:13px;margin-bottom:16px}th,td{border:1px solid #bbb;padding:3px 7px;text-align:right}th{background:#eef3ea}.popis{color:#555;margin:6px 0}.j{font-weight:normal;color:#666}';
+    const tel = bloky(D).map(b => `<h3>${esc(b.nazev)}</h3>` + vykresliBlok(b, false)).join('');
+    stahni(nazevSouboru('html'), `<!DOCTYPE html><html lang="cs"><head><meta charset="utf-8"><title>Agroklimatický výpis</title><style>${css}</style></head><body><h1>Agroklimatický výpis</h1><h3>${esc(nadpisLokality())}</h3>${tel}</body></html>`, 'text/html;charset=utf-8');
+}
+// ---------------------------------------------------------------------------------------------------
+// panel (změna šířky) a záložky – stejné jako v bdd
+// ---------------------------------------------------------------------------------------------------
+const panel = document.querySelector('.vegetacni-panel'), resizer = document.querySelector('.resizer'), resizer2 = document.querySelector('.resizer2'), resizer3 = document.querySelector('.resizer3');
+resizer.addEventListener('mousedown', e => { e.preventDefault(); window.addEventListener('mousemove', startResize, false); window.addEventListener('mouseup', stopResize, false); }, false);
+resizer2.addEventListener('mousedown', poz, false);
+function poz() {
+    if (panel.style.width !== '0px') {
+        panel.style.opacity = '0';
+        setTimeout(() => { panel.style.minWidth = '0px'; panel.style.width = '0px'; panel.style.padding = '0px'; resizer.style.width = '0px'; resizer2.style.left = '-28px'; resizer2.style.width = '25px'; resizer2.style.transform = 'scaleX(-1)'; resizer3.style.opacity = '1'; panel.style.transition = 'width 0.2s'; }, 50);
+    } else {
+        panel.style.minWidth = '20%'; panel.style.width = '45%'; panel.style.padding = '0px 5px 0px 10px'; resizer.style.width = '8px'; resizer2.style.left = '0px'; resizer2.style.width = '17px'; resizer2.style.transform = 'scaleX(1)'; resizer3.style.opacity = '0.25';
+        setTimeout(() => { panel.style.opacity = '1'; map.invalidateSize(); }, 200);
+    }
+}
+new ResizeObserver(() => map.invalidateSize()).observe($('mapa-kontainer'));
+function startResize(e) { panel.style.width = (panel.getBoundingClientRect().right - e.clientX) + 'px'; map.invalidateSize(); }
+function stopResize() { window.removeEventListener('mousemove', startResize, false); window.removeEventListener('mouseup', stopResize, false); }
+function switchTab(event, tabId) {
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    $(tabId).classList.add('active'); event.currentTarget.classList.add('active');
+    setTimeout(() => { sliderDekady.calculateDensity(); if (sliderRoky) sliderRoky.calculateDensity(); }, 0);
+}
+
+// ---------------------------------------------------------------------------------------------------
+// inicializace
+// ---------------------------------------------------------------------------------------------------
+async function inicializace() {
+    try {
+        reg = await (await fetch(URL_REG)).json();
+        const kb = await (await fetch(reg.soubor_kody)).arrayBuffer();
+        K = new KlimaDekoder(reg, kb);
+        T = reg.mrizka.tile; PX = reg.mrizka.dlazdic_x;
+        const bin = atob(reg.maska_pevniny_b64); maskaBity = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) maskaBity[i] = bin.charCodeAt(i);
+    } catch (e) { $('vysv').innerHTML = '<p style="color:#b71c1c;">Nepodařilo se načíst databázi (registrace_klima.json, kody_klima.bin): ' + esc(e.message) + '</p>'; panel.style.display = 'flex'; return; }
+    try { druhy = KA.nactiDruhy(await (await fetch(URL_DRUHY)).json()); } catch (e) { druhy = null; }
+    const rokMax = reg.rok_od + K.NY - 1;
+    const sl = $('gsl_rok_slider'); sl.min = reg.rok_od; sl.max = rokMax; sl.value = reg.rok_od + 20; $('gsl_rok_label').textContent = sl.value;
+    SCALES['roků'] = Array.from({ length: K.NY }, (_, i) => reg.rok_od + i);
+    SCALES['dekády'] = Array.from({ length: 36 }, (_, i) => String(i + 1));
+    sliderDekady = new MultiSlider('slider-dekady-kontejner', 'dekády', 'vybrane_dekady');
+    sliderRoky = new MultiSlider('slider-roky-kontejner', 'roků', 'vybrane_roky');
+    sliderRoky.pairs[0].leftIndex = 0; sliderRoky.pairs[0].rightIndex = K.NY - 1; sliderRoky.updateDOM();
+    nastavDekady([[0, 35]]); nastavSezonyMapa();
+    bublParam = new Bublina($('btn-parametry'), vytvorOknoBubliny('bubl-param', 620), { exkluzivni: false });
+    bublNast = new Bublina($('btn-parametry'), vytvorOknoBubliny('bubl-nast', 430), {});
+    bublMapa = new Bublina($('btn-mapa-parametry'), vytvorOknoBubliny('bubl-mapa', 420), {});
+    bublNast.rodic = bublParam;
+    sestavParametry(); sestavMapaBublinu();
+    $('btn-parametry').addEventListener('click', () => bublParam.prepni());
+    $('btn-mapa-parametry').addEventListener('click', () => bublMapa.prepni());
+    panel.style.display = 'flex';
+    map.invalidateSize();
+    if (!druhy) { $('vysv').insertAdjacentHTML('beforeend', '<p style="color:#b71c1c;">Soubor druhy_klima.json se nenačetl, volba Klimatický zemědělský potenciál je vypnutá.</p>'); }
+}
+
+inicializace();
+</script>
+</body>
+</html>
